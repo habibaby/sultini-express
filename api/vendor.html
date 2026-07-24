@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sultini Express — Vendor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --plum:#6B5058; --plum-deep:#3E2E33;
+    --rose:#C6577A; --rose-deep:#A8425F;
+    --stone:#E7D4CE; --stone-deep:#D2B6AC;
+    --blush:#FBEEEC; --ink:#2E2528; --ink-soft:#8A7A7E;
+    --line:rgba(107,80,88,0.14); --radius:18px;
+    --green:#4E8B5C; --amber:#B8863C; --red:#B84C4C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Inter',sans-serif; background:var(--blush); color:var(--ink); -webkit-font-smoothing:antialiased; padding-bottom:80px;}
+  h1,h2,h3,.brand{font-family:'Fraunces',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit; text-decoration:none;}
+  img{display:block; max-width:100%;}
+  button, input, select, textarea{font-family:inherit;}
+  button{cursor:pointer;}
+
+  header{position:sticky; top:0; z-index:40; background:rgba(251,238,236,0.95); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+  .nav-row{display:flex; align-items:center; justify-content:space-between; padding:14px 18px;}
+  .brand{font-size:19px; font-weight:700; color:var(--plum); display:flex; align-items:center; gap:8px;}
+  .brand .dot{width:8px; height:8px; border-radius:50%; background:var(--rose);}
+  .back-btn{width:36px; height:36px; border-radius:50%; background:#fff; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--plum);}
+  .tag-vendor{font-size:11px; font-weight:700; color:var(--plum); background:var(--stone); padding:5px 10px; border-radius:100px;}
+
+  .wrap{max-width:640px; margin:0 auto; padding:0 18px;}
+
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  /* ---- progress ---- */
+  .progress{display:flex; gap:6px; margin:18px 0 22px;}
+  .progress .seg{flex:1; height:4px; border-radius:4px; background:var(--line);}
+  .progress .seg.done{background:var(--rose);}
+
+  .step-title{font-size:22px; font-weight:700; color:var(--plum); margin-bottom:4px;}
+  .step-sub{font-size:13.5px; color:var(--ink-soft); margin-bottom:20px;}
+
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; color:var(--plum); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line);
+    background:#fff; font-size:14px; color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--rose);}
+  .field-row{display:flex; gap:12px;}
+  .field-row .field{flex:1;}
+
+  .cat-select-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .cat-select{padding:14px; border-radius:14px; border:1.5px solid var(--line); background:#fff; text-align:left; font-size:13.5px; font-weight:600;}
+  .cat-select.selected{border-color:var(--rose); background:rgba(198,87,122,0.06); color:var(--rose-deep);}
+
+  /* ---- menu builder ---- */
+  .menu-draft-item{display:flex; gap:10px; align-items:center; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:10px; margin-bottom:10px;}
+  .photo-upload{width:52px; height:52px; border-radius:10px; background:var(--stone); display:flex; align-items:center; justify-content:center; font-size:18px; flex:0 0 auto; color:var(--plum-deep);}
+  .menu-draft-body{flex:1; min-width:0;}
+  .menu-draft-body .n{font-size:13.5px; font-weight:700;}
+  .menu-draft-body .p{font-size:12px; color:var(--ink-soft);}
+  .stock-toggle{display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--green);}
+  .remove-item{width:28px; height:28px; border-radius:8px; border:1.5px solid var(--line); background:#fff; color:var(--ink-soft); font-size:14px;}
+  .add-item-btn{width:100%; padding:13px; border-radius:12px; border:1.5px dashed var(--rose); background:transparent; color:var(--rose-deep); font-weight:700; font-size:13.5px;}
+
+  /* ---- split disclosure ---- */
+  .split-box{background:var(--plum); color:#fff; border-radius:16px; padding:18px; margin:20px 0;}
+  .split-box h3{font-size:15px; margin-bottom:10px;}
+  .split-row{display:flex; gap:10px; margin-bottom:12px;}
+  .split-chip{flex:1; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:12px; padding:10px;}
+  .split-chip .pct{font-family:'Fraunces',serif; font-size:22px; font-weight:700;}
+  .split-chip .who{font-size:11px; color:rgba(255,255,255,0.8);}
+  .split-box p{font-size:12px; color:rgba(255,255,255,0.85); line-height:1.5;}
+  .agree-row{display:flex; align-items:flex-start; gap:10px; margin-top:16px; font-size:13px; color:var(--ink-soft);}
+  .agree-row input{margin-top:2px;}
+
+  .btn{width:100%; padding:15px; border-radius:100px; border:none; font-weight:700; font-size:15px; text-align:center;}
+  .btn-primary{background:var(--rose); color:#fff; box-shadow:0 6px 0 0 var(--rose-deep);}
+  .btn-primary:active{box-shadow:0 2px 0 0 var(--rose-deep); transform:translateY(4px);}
+  .btn-primary.disabled{background:var(--line); box-shadow:none; color:var(--ink-soft); pointer-events:none;}
+  .btn-secondary{background:#fff; color:var(--plum); border:1.5px solid var(--line);}
+
+  /* ---- pending screen ---- */
+  .confirm-wrap{text-align:center; padding-top:40px;}
+  .confirm-icon{width:64px; height:64px; border-radius:50%; background:var(--amber); color:#fff; font-size:28px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;}
+
+  /* ---- dashboard ---- */
+  .tabs{display:flex; gap:8px; margin:16px 0 20px; background:#fff; border:1px solid var(--line); border-radius:100px; padding:4px;}
+  .tab{flex:1; text-align:center; padding:10px; border-radius:100px; font-size:13px; font-weight:700; color:var(--ink-soft);}
+  .tab.active{background:var(--plum); color:#fff;}
+
+  .order-card{background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .order-card .top{display:flex; justify-content:space-between; align-items:flex-start;}
+  .order-card .oid{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);}
+  .order-card h4{font-size:14.5px; margin-top:2px;}
+  .status-pill{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:100px;}
+  .status-pill.new{background:rgba(198,87,122,0.12); color:var(--rose-deep);}
+  .status-pill.preparing{background:rgba(184,134,60,0.12); color:var(--amber);}
+  .status-pill.ready{background:rgba(78,139,92,0.12); color:var(--green);}
+  .order-items{font-size:12.5px; color:var(--ink-soft); margin:8px 0;}
+  .order-actions{display:flex; gap:8px; margin-top:10px;}
+  .order-actions button{flex:1; padding:10px; border-radius:10px; font-size:12.5px; font-weight:700; border:1.5px solid var(--line); background:#fff; color:var(--plum);}
+  .order-actions button.primary{background:var(--rose); color:#fff; border-color:var(--rose);}
+
+  .menu-manage-item{display:flex; gap:10px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:10px;}
+  .menu-manage-item img{width:52px; height:52px; border-radius:10px; object-fit:cover; flex:0 0 auto;}
+  .menu-manage-body{flex:1; min-width:0;}
+  .menu-manage-body .n{font-size:13.5px; font-weight:700;}
+  .menu-manage-body .p{font-size:12px; color:var(--ink-soft);}
+  .switch{position:relative; width:42px; height:24px; border-radius:100px; background:var(--line); flex:0 0 auto; border:none;}
+  .switch.on{background:var(--green);}
+  .switch::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s;}
+  .switch.on::after{transform:translateX(18px);}
+
+  .earn-card{background:var(--plum); color:#fff; border-radius:18px; padding:20px; margin-bottom:16px;}
+  .earn-card .label{font-size:12px; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.04em;}
+  .earn-card .amt{font-family:'Fraunces',serif; font-size:32px; font-weight:700; margin-top:4px;}
+  .earn-sub{display:flex; gap:10px; margin-top:14px;}
+  .earn-sub-chip{flex:1; background:rgba(255,255,255,0.1); border-radius:10px; padding:10px;}
+  .earn-sub-chip .n{font-size:15px; font-weight:700;}
+  .earn-sub-chip .l{font-size:10.5px; color:rgba(255,255,255,0.75);}
+
+  .payout-row{display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px; font-size:13px;}
+  .payout-row .amt{font-weight:700;}
+  .payout-status{font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:100px;}
+  .payout-status.paid{background:rgba(78,139,92,0.12); color:var(--green);}
+  .payout-status.pending{background:rgba(184,134,60,0.12); color:var(--amber);}
+
+  .note{font-size:12px; color:var(--ink-soft); background:rgba(107,80,88,0.06); border-radius:10px; padding:10px 12px; margin:12px 0;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav-row">
+    <button class="back-btn" id="backBtn" style="visibility:hidden;">←</button>
+    <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
+    <span class="tag-vendor">Vendor</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- AUTH GATE -->
+<section class="screen active" id="screen-auth">
+  <div class="step-title">Vendor log in</div>
+  <div class="step-sub">Log in or create an account to register your store.</div>
+  <div class="field"><label>Email</label><input type="email" id="vAuthEmail"></div>
+  <div class="field"><label>Password</label><input type="password" id="vAuthPassword"></div>
+  <button class="btn btn-primary" onclick="vendorLogin()" style="margin-bottom:10px;">Log in</button>
+  <button class="btn btn-secondary" onclick="vendorSignup()">Sign up instead</button>
+  <div id="vAuthError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
+</section>
+
+<!-- STEP 1: BUSINESS DETAILS -->
+<section class="screen" id="screen-step1">
+  <div class="progress"><div class="seg done"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+  <div class="step-title">Tell us about your store</div>
+  <div class="step-sub">This is what customers will see first.</div>
+
+  <div class="field">
+    <label>Store name</label>
+    <input type="text" placeholder="e.g. Musa's Kitchen" id="bizName">
+  </div>
+  <div class="field">
+    <label>Store type</label>
+    <div class="cat-select-grid">
+      <button class="cat-select" data-cat="restaurant">🍲 Restaurant</button>
+      <button class="cat-select" data-cat="pharmacy">💊 Pharmacy</button>
+    </div>
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label>Phone number</label>
+      <input type="tel" placeholder="080X XXX XXXX" id="bizPhone">
+    </div>
+    <div class="field">
+      <label>WhatsApp (optional)</label>
+      <input type="tel" placeholder="080X XXX XXXX" id="bizWhatsapp">
+    </div>
+  </div>
+  <div class="field">
+    <label>Store address</label>
+    <textarea rows="2" placeholder="e.g. No. 12 Runjin Sambo Road, Sokoto" id="bizAddress"></textarea>
+  </div>
+
+  <button class="btn btn-primary" onclick="goStep(2)">Continue</button>
+</section>
+
+<!-- STEP 2: MENU SETUP -->
+<section class="screen" id="screen-step2">
+  <div class="progress"><div class="seg done"></div><div class="seg done"></div><div class="seg"></div><div class="seg"></div></div>
+  <div class="step-title">Add your first items</div>
+  <div class="step-sub">You can add photos and edit stock status any time from your dashboard.</div>
+
+  <div id="menuDraftList"></div>
+  <button class="add-item-btn" onclick="addDraftItem()">＋ Add menu item</button>
+
+  <div style="margin-top:20px;">
+    <button class="btn btn-primary" onclick="goStep(3)">Continue</button>
+  </div>
+</section>
+
+<!-- STEP 3: PAYOUT + SPLIT -->
+<section class="screen" id="screen-step3">
+  <div class="progress"><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div><div class="seg"></div></div>
+  <div class="step-title">Payout details</div>
+  <div class="step-sub">Where your earnings are sent when you cash out.</div>
+
+  <div class="field">
+    <label>Bank name</label>
+    <input type="text" placeholder="e.g. Access Bank" id="bankName">
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label>Account number</label>
+      <input type="text" placeholder="0123456789" id="acctNumber">
+    </div>
+    <div class="field">
+      <label>Account name</label>
+      <input type="text" placeholder="Must match store owner" id="acctName">
+    </div>
+  </div>
+
+  <div class="split-box">
+    <h3>How you get paid</h3>
+    <div class="split-row">
+      <div class="split-chip"><div class="pct">80%</div><div class="who">goes to you</div></div>
+      <div class="split-chip"><div class="pct">20%</div><div class="who">platform fee</div></div>
+    </div>
+    <p>Every payment goes through Sultini's Paystack account. Your 80% builds up in your Sultini balance. If there's no dispute within 1 day of an order, you can request a cash-out the next day — Sultini reviews and pays it to the account above.</p>
+  </div>
+
+  <label class="agree-row">
+    <input type="checkbox" id="agreeCheck" onchange="toggleSubmit()">
+    <span>I understand and agree to the 80/20 revenue split and payout terms above.</span>
+  </label>
+
+  <div style="margin-top:16px;">
+    <button class="btn btn-primary disabled" id="submitBtn" onclick="submitRegistration()">Submit for review</button>
+  </div>
+</section>
+
+<!-- PENDING -->
+<section class="screen" id="screen-pending">
+  <div class="confirm-wrap">
+    <div class="confirm-icon">⏳</div>
+    <h2 style="font-size:22px; color:var(--plum);">Submitted for review</h2>
+    <p style="color:var(--ink-soft); font-size:14px; margin-top:8px; max-width:340px; margin-left:auto; margin-right:auto;">
+      Sultini reviews new stores before they go live. You'll be notified once approved — usually within a day.
+    </p>
+    <button class="btn btn-primary" style="margin-top:30px;" onclick="goDashboard()">Preview my dashboard →</button>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section class="screen" id="screen-dashboard">
+  <div class="step-title" style="margin-top:16px;">Musa's Kitchen</div>
+  <div class="step-sub">Your vendor dashboard</div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="orders" onclick="switchTab('orders')">Orders</div>
+    <div class="tab" data-tab="menu" onclick="switchTab('menu')">Menu</div>
+    <div class="tab" data-tab="earnings" onclick="switchTab('earnings')">Earnings</div>
+  </div>
+
+  <!-- ORDERS TAB -->
+  <div id="tab-orders">
+    <div class="order-card">
+      <div class="top">
+        <div><div class="oid">SK · 7429</div><h4>2 items · ₦5,500</h4></div>
+        <span class="status-pill new">New order</span>
+      </div>
+      <div class="order-items">1× Jollof Rice & Chicken, 1× Fura da Nono · Pickup, ASAP</div>
+      <div class="order-actions">
+        <button onclick="advanceOrder(this,'preparing')">Reject</button>
+        <button class="primary" onclick="advanceOrder(this,'preparing')">Accept order</button>
+      </div>
+    </div>
+    <div class="order-card">
+      <div class="top">
+        <div><div class="oid">SK · 6210</div><h4>1 item · ₦3,500</h4></div>
+        <span class="status-pill preparing">Preparing</span>
+      </div>
+      <div class="order-items">1× Beef Suya (Full) · Delivery, rider assigned</div>
+      <div class="order-actions">
+        <button class="primary" onclick="advanceOrder(this,'ready')">Mark as ready</button>
+      </div>
+    </div>
+    <div class="order-card">
+      <div class="top">
+        <div><div class="oid">SK · 5992</div><h4>3 items · ₦8,200</h4></div>
+        <span class="status-pill ready">Ready</span>
+      </div>
+      <div class="order-items">Waiting for pickup at your set time</div>
+    </div>
+  </div>
+
+  <!-- MENU TAB -->
+  <div id="tab-menu" style="display:none;">
+    <div class="note">Toggle items off when you run out — customers won't be able to order them.</div>
+    <div id="menuManageList"></div>
+    <button class="add-item-btn" onclick="addManageItem()">＋ Add menu item</button>
+  </div>
+
+  <!-- EARNINGS TAB -->
+  <div id="tab-earnings" style="display:none;">
+    <div class="earn-card">
+      <div class="label">Available to cash out</div>
+      <div class="amt">₦46,800</div>
+      <div class="earn-sub">
+        <div class="earn-sub-chip"><div class="n">₦12,400</div><div class="l">In dispute window</div></div>
+        <div class="earn-sub-chip"><div class="n">₦210,600</div><div class="l">All-time earned</div></div>
+      </div>
+    </div>
+    <div class="note">Orders enter a 1-day dispute window before their earnings become available. No dispute = ready to cash out the next day.</div>
+    <button class="btn btn-primary" onclick="requestCashout()">Request cash-out</button>
+
+    <div style="margin-top:22px; font-size:13px; font-weight:700; color:var(--plum);">Recent payouts</div>
+    <div style="margin-top:10px;">
+      <div class="payout-row"><span>Jul 21 · Cash-out</span><span class="amt">₦38,200</span><span class="payout-status paid">Paid</span></div>
+      <div class="payout-row"><span>Jul 14 · Cash-out</span><span class="amt">₦29,900</span><span class="payout-status paid">Paid</span></div>
+      <div class="payout-row"><span>Jul 24 · Requested</span><span class="amt">₦46,800</span><span class="payout-status pending" id="pendingPayoutStatus">Pending review</span></div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script src="supabase-config.js"></script>
+<script>
+let draftItems = [];
+let draftIdCounter = 1;
+
+// ---- Auth ----
+let currentVendor = null;
+
+function addDraftItem(){
+  const id = 'd'+draftIdCounter++;
+  draftItems.push({id, name:'', price:'', inStock:true});
+  renderDraftItems();
+}
+function removeDraftItem(id){
+  draftItems = draftItems.filter(i=>i.id!==id);
+  renderDraftItems();
+}
+function updateDraftField(id, field, value){
+  const item = draftItems.find(i=>i.id===id);
+  if(item) item[field] = value;
+}
+function toggleDraftStock(id){
+  const item = draftItems.find(i=>i.id===id);
+  if(item) item.inStock = !item.inStock;
+  renderDraftItems();
+}
+function renderDraftItems(){
+  const el = document.getElementById('menuDraftList');
+  el.innerHTML = draftItems.map(item => `
+    <div class="menu-draft-item">
+      <div class="photo-upload">📷</div>
+      <div class="menu-draft-body">
+        <input type="text" placeholder="Item name" value="${item.name}" oninput="updateDraftField('${item.id}','name',this.value)" style="border:none; font-size:13.5px; font-weight:700; width:100%; padding:2px 0; background:transparent;">
+        <input type="text" placeholder="Price (₦)" value="${item.price}" oninput="updateDraftField('${item.id}','price',this.value)" style="border:none; font-size:12px; color:var(--ink-soft); width:100%; padding:2px 0; background:transparent;">
+      </div>
+      <button class="stock-toggle" onclick="toggleDraftStock('${item.id}')" style="background:none; border:none;">${item.inStock ? '● In stock' : '○ Out of stock'}</button>
+      <button class="remove-item" onclick="removeDraftItem('${item.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function goStep(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-step'+n).classList.add('active');
+  document.getElementById('backBtn').style.visibility = n>1 ? 'visible':'hidden';
+  window.scrollTo(0,0);
+  if(n===2 && draftItems.length===0) addDraftItem();
+}
+
+document.querySelectorAll('.cat-select').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.cat-select').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
+});
+
+// ---- Auth ----
+let currentVendor = null;
+
+async function vendorLogin(){
+  const email = document.getElementById('vAuthEmail').value.trim();
+  const password = document.getElementById('vAuthPassword').value;
+  const err = document.getElementById('vAuthError');
+  err.textContent = '';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){ err.textContent = error.message; return; }
+  await afterLogin();
+}
+async function vendorSignup(){
+  const email = document.getElementById('vAuthEmail').value.trim();
+  const password = document.getElementById('vAuthPassword').value;
+  const err = document.getElementById('vAuthError');
+  err.textContent = '';
+  const { error } = await supabaseClient.auth.signUp({ email, password });
+  if(error){ err.textContent = error.message; return; }
+  err.style.color = 'var(--green)';
+  err.textContent = 'Account created — check your email to confirm, then log in.';
+}
+
+async function afterLogin(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session) return;
+
+  const { data: vendors } = await supabaseClient
+    .from('vendors').select('*').eq('owner_id', session.user.id).limit(1);
+
+  if(vendors && vendors.length > 0){
+    currentVendor = vendors[0];
+    if(currentVendor.status === 'approved'){
+      goDashboard();
+    }else{
+      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+      document.getElementById('screen-pending').classList.add('active');
+    }
+  } else {
+    goStep(1); // no store yet — start registration
+  }
+}
+
+// ---- Registration submit (real) ----
+async function submitRegistration(){
+  if(document.getElementById('submitBtn').classList.contains('disabled')) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session){ alert('Please log in first.'); return; }
+
+  const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'restaurant';
+  const { data: vendorRows, error: vErr } = await supabaseClient.from('vendors').insert([{
+    owner_id: session.user.id,
+    name: document.getElementById('bizName').value.trim(),
+    category,
+    phone: document.getElementById('bizPhone').value.trim(),
+    whatsapp: document.getElementById('bizWhatsapp').value.trim(),
+    address: document.getElementById('bizAddress').value.trim(),
+    bank_name: document.getElementById('bankName').value.trim(),
+    account_number: document.getElementById('acctNumber').value.trim(),
+    account_name: document.getElementById('acctName').value.trim(),
+    status: 'pending'
+  }]).select();
+
+  if(vErr){ alert('Could not submit: ' + vErr.message); return; }
+  const vendor = vendorRows[0];
+  currentVendor = vendor;
+
+  const validItems = draftItems.filter(i => i.name && i.price);
+  if(validItems.length > 0){
+    await supabaseClient.from('menu_items').insert(
+      validItems.map(i => ({
+        vendor_id: vendor.id, name: i.name, price: Number(i.price), in_stock: i.inStock
+      }))
+    );
+  }
+
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-pending').classList.add('active');
+  document.getElementById('backBtn').style.visibility = 'hidden';
+  window.scrollTo(0,0);
+}
+
+function goStep(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-step'+n).classList.add('active');
+  document.getElementById('backBtn').style.visibility = n>1 ? 'visible':'hidden';
+  window.scrollTo(0,0);
+  if(n===2 && draftItems.length===0) addDraftItem();
+}
+
+document.querySelectorAll('.cat-select').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.cat-select').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
+});
+
+function toggleSubmit(){
+  document.getElementById('submitBtn').classList.toggle('disabled', !document.getElementById('agreeCheck').checked);
+}
+
+// ---- Dashboard (real data) ----
+async function goDashboard(){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-dashboard').classList.add('active');
+  document.getElementById('backBtn').style.visibility = 'visible';
+  document.querySelector('#screen-dashboard .step-title').textContent = currentVendor.name;
+  await loadOrders();
+  await loadMenu();
+  await loadEarnings();
+  window.scrollTo(0,0);
+}
+
+document.getElementById('backBtn').addEventListener('click', ()=>{
+  const active = document.querySelector('.screen.active').id;
+  if(active==='screen-step2') goStep(1);
+  else if(active==='screen-step3') goStep(2);
+  else if(active==='screen-dashboard'){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById('screen-auth').classList.add('active'); document.getElementById('backBtn').style.visibility='hidden'; }
+});
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('tab-orders').style.display = tab==='orders' ? 'block':'none';
+  document.getElementById('tab-menu').style.display = tab==='menu' ? 'block':'none';
+  document.getElementById('tab-earnings').style.display = tab==='earnings' ? 'block':'none';
+}
+
+async function loadOrders(){
+  const { data: orders } = await supabaseClient
+    .from('orders').select('*').eq('vendor_id', currentVendor.id).order('created_at', {ascending:false}).limit(20);
+  const el = document.getElementById('tab-orders');
+  if(!orders || orders.length === 0){ el.innerHTML = '<div class="note">No orders yet.</div>'; return; }
+  el.innerHTML = orders.map(o => `
+    <div class="order-card">
+      <div class="top">
+        <div><div class="oid">${o.pickup_code}</div><h4>₦${Number(o.total).toLocaleString()}</h4></div>
+        <span class="status-pill ${o.status==='ready'?'ready':(o.status==='preparing'?'preparing':'new')}">${o.status}</span>
+      </div>
+      <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
+      ${o.status==='new' ? `<div class="order-actions"><button onclick="updateOrderStatus('${o.id}','rejected')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
+      ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready')">Mark as ready</button></div>` : ''}
+    </div>
+  `).join('');
+}
+async function updateOrderStatus(orderId, status){
+  await supabaseClient.from('orders').update({ status }).eq('id', orderId);
+  await loadOrders();
+}
+
+async function loadMenu(){
+  const { data: items } = await supabaseClient
+    .from('menu_items').select('*').eq('vendor_id', currentVendor.id);
+  window.menuItems = items || [];
+  renderManageItems();
+}
+function renderManageItems(){
+  const el = document.getElementById('menuManageList');
+  if(!window.menuItems || window.menuItems.length === 0){ el.innerHTML = '<div class="note">No menu items yet.</div>'; return; }
+  el.innerHTML = window.menuItems.map(item => `
+    <div class="menu-manage-item">
+      <img src="${item.photo_url || ''}" alt="${item.name}" style="background:var(--stone);">
+      <div class="menu-manage-body"><div class="n">${item.name}</div><div class="p">₦${Number(item.price).toLocaleString()}</div></div>
+      <button class="switch ${item.in_stock?'on':''}" onclick="toggleManageStock('${item.id}')"></button>
+    </div>
+  `).join('');
+}
+async function toggleManageStock(id){
+  const item = window.menuItems.find(i=>i.id===id);
+  await supabaseClient.from('menu_items').update({ in_stock: !item.in_stock }).eq('id', id);
+  await loadMenu();
+}
+async function addManageItem(){
+  const name = prompt('Item name?');
+  if(!name) return;
+  const price = prompt('Price (₦)?');
+  if(!price) return;
+  await supabaseClient.from('menu_items').insert([{ vendor_id: currentVendor.id, name, price: Number(price), in_stock: true }]);
+  await loadMenu();
+}
+
+async function loadEarnings(){
+  const { data: entries } = await supabaseClient
+    .from('ledger_entries').select('*').eq('vendor_id', currentVendor.id);
+  const list = entries || [];
+  const available = list.filter(e=>e.status==='available').reduce((s,e)=>s+Number(e.amount),0);
+  const inWindow = list.filter(e=>e.status==='in_dispute_window').reduce((s,e)=>s+Number(e.amount),0);
+  const allTime = list.reduce((s,e)=>s+Number(e.amount),0);
+  document.querySelector('.earn-card .amt').textContent = '₦'+available.toLocaleString();
+  const chips = document.querySelectorAll('.earn-sub-chip .n');
+  if(chips[0]) chips[0].textContent = '₦'+inWindow.toLocaleString();
+  if(chips[1]) chips[1].textContent = '₦'+allTime.toLocaleString();
+}
+
+async function requestCashout(){
+  await supabaseClient.from('ledger_entries')
+    .update({ status: 'cashout_requested' })
+    .eq('vendor_id', currentVendor.id).eq('status', 'available');
+  alert("Cash-out requested. Sultini will review and approve payment to your account on file, assuming no disputes are raised.");
+  await loadEarnings();
+}
+
+document.getElementById('backToBrowseBtn')?.addEventListener('click', ()=>{});
+
+supabaseClient.auth.getSession().then(({data:{session}}) => { if(session) afterLogin(); });
+</script>
+</body>
+</html>
