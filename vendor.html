@@ -307,7 +307,19 @@
   <div id="tab-menu" style="display:none;">
     <div class="note">Toggle items off when you run out — customers won't be able to order them.</div>
     <div id="menuManageList"></div>
-    <button class="add-item-btn" onclick="addManageItem()">＋ Add menu item</button>
+    <div id="newItemForm" style="display:none; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px;">
+      <div class="field"><label>Item name</label><input type="text" id="newItemName"></div>
+      <div class="field"><label>Price (₦)</label><input type="text" id="newItemPrice"></div>
+      <div class="field">
+        <label>Photo</label>
+        <label class="photo-upload" style="cursor:pointer; width:100%; height:90px; border-radius:12px;">
+          <span id="newItemPhotoLabel">📷 Tap to choose a photo</span>
+          <input type="file" accept="image/*" style="display:none;" id="newItemPhotoInput" onchange="previewNewItemPhoto(this)">
+        </label>
+      </div>
+      <button class="btn btn-primary" onclick="saveNewMenuItem()">Save item</button>
+    </div>
+    <button class="add-item-btn" onclick="document.getElementById('newItemForm').style.display='block'; this.style.display='none';">＋ Add menu item</button>
   </div>
 
   <!-- EARNINGS TAB -->
@@ -344,7 +356,7 @@ let currentVendor = null;
 
 function addDraftItem(){
   const id = 'd'+draftIdCounter++;
-  draftItems.push({id, name:'', price:'', inStock:true});
+  draftItems.push({id, name:'', price:'', inStock:true, photo_url:null});
   renderDraftItems();
 }
 function removeDraftItem(id){
@@ -360,11 +372,25 @@ function toggleDraftStock(id){
   if(item) item.inStock = !item.inStock;
   renderDraftItems();
 }
+async function uploadDraftPhoto(id, inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  const item = draftItems.find(i=>i.id===id);
+  const path = `drafts/${Date.now()}-${file.name}`;
+  const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
+  if(error){ alert('Photo upload failed: ' + error.message); return; }
+  const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
+  item.photo_url = data.publicUrl;
+  renderDraftItems();
+}
 function renderDraftItems(){
   const el = document.getElementById('menuDraftList');
   el.innerHTML = draftItems.map(item => `
     <div class="menu-draft-item">
-      <div class="photo-upload">📷</div>
+      <label class="photo-upload" style="cursor:pointer; overflow:hidden; padding:0;">
+        ${item.photo_url ? `<img src="${item.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">` : '📷'}
+        <input type="file" accept="image/*" style="display:none;" onchange="uploadDraftPhoto('${item.id}', this)">
+      </label>
       <div class="menu-draft-body">
         <input type="text" placeholder="Item name" value="${item.name}" oninput="updateDraftField('${item.id}','name',this.value)" style="border:none; font-size:13.5px; font-weight:700; width:100%; padding:2px 0; background:transparent;">
         <input type="text" placeholder="Price (₦)" value="${item.price}" oninput="updateDraftField('${item.id}','price',this.value)" style="border:none; font-size:12px; color:var(--ink-soft); width:100%; padding:2px 0; background:transparent;">
@@ -374,21 +400,6 @@ function renderDraftItems(){
     </div>
   `).join('');
 }
-
-function goStep(n){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-step'+n).classList.add('active');
-  document.getElementById('backBtn').style.visibility = n>1 ? 'visible':'hidden';
-  window.scrollTo(0,0);
-  if(n===2 && draftItems.length===0) addDraftItem();
-}
-
-document.querySelectorAll('.cat-select').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.cat-select').forEach(b=>b.classList.remove('selected'));
-    btn.classList.add('selected');
-  });
-});
 
 async function vendorLogin(){
   const email = document.getElementById('vAuthEmail').value.trim();
@@ -458,7 +469,7 @@ async function submitRegistration(){
   if(validItems.length > 0){
     await supabaseClient.from('menu_items').insert(
       validItems.map(i => ({
-        vendor_id: vendor.id, name: i.name, price: Number(i.price), in_stock: i.inStock
+        vendor_id: vendor.id, name: i.name, price: Number(i.price), in_stock: i.inStock, photo_url: i.photo_url || null
       }))
     );
   }
@@ -547,7 +558,10 @@ function renderManageItems(){
   if(!window.menuItems || window.menuItems.length === 0){ el.innerHTML = '<div class="note">No menu items yet.</div>'; return; }
   el.innerHTML = window.menuItems.map(item => `
     <div class="menu-manage-item">
-      <img src="${item.photo_url || ''}" alt="${item.name}" style="background:var(--stone);">
+      <label style="cursor:pointer; flex:0 0 auto;">
+        <img src="${item.photo_url || ''}" alt="${item.name}" style="background:var(--stone); width:52px; height:52px; border-radius:10px; object-fit:cover;">
+        <input type="file" accept="image/*" style="display:none;" onchange="changeItemPhoto('${item.id}', this)">
+      </label>
       <div class="menu-manage-body"><div class="n">${item.name}</div><div class="p">₦${Number(item.price).toLocaleString()}</div></div>
       <button class="switch ${item.in_stock?'on':''}" onclick="toggleManageStock('${item.id}')"></button>
     </div>
@@ -558,12 +572,46 @@ async function toggleManageStock(id){
   await supabaseClient.from('menu_items').update({ in_stock: !item.in_stock }).eq('id', id);
   await loadMenu();
 }
-async function addManageItem(){
-  const name = prompt('Item name?');
-  if(!name) return;
-  const price = prompt('Price (₦)?');
-  if(!price) return;
-  await supabaseClient.from('menu_items').insert([{ vendor_id: currentVendor.id, name, price: Number(price), in_stock: true }]);
+let newItemPhotoFile = null;
+function previewNewItemPhoto(inputEl){
+  newItemPhotoFile = inputEl.files[0];
+  if(newItemPhotoFile){
+    document.getElementById('newItemPhotoLabel').textContent = '✓ ' + newItemPhotoFile.name;
+  }
+}
+async function saveNewMenuItem(){
+  const name = document.getElementById('newItemName').value.trim();
+  const price = document.getElementById('newItemPrice').value.trim();
+  if(!name || !price){ alert('Enter a name and price.'); return; }
+
+  let photo_url = null;
+  if(newItemPhotoFile){
+    const path = `${currentVendor.id}/${Date.now()}-${newItemPhotoFile.name}`;
+    const { error } = await supabaseClient.storage.from('menu-photos').upload(path, newItemPhotoFile);
+    if(error){ alert('Photo upload failed: ' + error.message); return; }
+    const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
+    photo_url = data.publicUrl;
+  }
+
+  await supabaseClient.from('menu_items').insert([{ vendor_id: currentVendor.id, name, price: Number(price), in_stock: true, photo_url }]);
+
+  document.getElementById('newItemName').value = '';
+  document.getElementById('newItemPrice').value = '';
+  document.getElementById('newItemPhotoLabel').textContent = '📷 Tap to choose a photo';
+  newItemPhotoFile = null;
+  document.getElementById('newItemForm').style.display = 'none';
+  document.querySelector('.add-item-btn').style.display = 'block';
+  await loadMenu();
+}
+
+async function changeItemPhoto(itemId, inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  const path = `${currentVendor.id}/${Date.now()}-${file.name}`;
+  const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
+  if(error){ alert('Photo upload failed: ' + error.message); return; }
+  const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
+  await supabaseClient.from('menu_items').update({ photo_url: data.publicUrl }).eq('id', itemId);
   await loadMenu();
 }
 
