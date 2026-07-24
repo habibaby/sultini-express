@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sultini Express — Food & Pharmacy Delivery, Sokoto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --plum:#6B5058;
+    --plum-deep:#3E2E33;
+    --habanero:#C6577A;
+    --habanero-deep:#A8425F;
+    --lime:#E7D4CE;
+    --warm-white:#FBEEEC;
+    --charcoal:#2E2528;
+    --ink-soft:#8A7A7E;
+    --line:rgba(107,80,88,0.14);
+    --radius:18px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--warm-white);
+    color:var(--charcoal);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  h1,h2,h3,.brand{font-family:'Fraunces',serif; font-optical-sizing:auto;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit; text-decoration:none;}
+  img{display:block; max-width:100%;}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 20px;}
+
+  /* ---------- Header ---------- */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(251,238,236,0.92);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px;
+    max-width:1180px; margin:0 auto;
+  }
+  .brand{
+    font-size:20px; font-weight:700; color:var(--plum);
+    display:flex; align-items:center; gap:8px;
+    letter-spacing:-0.02em;
+  }
+  .brand .dot{
+    width:9px; height:9px; border-radius:50%; background:var(--habanero);
+    display:inline-block;
+  }
+  .nav-actions{display:flex; align-items:center; gap:10px;}
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14px;
+    padding:9px 16px; border-radius:100px;
+    border:none; cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+    white-space:nowrap;
+  }
+  .btn:active{transform:scale(0.96);}
+  .btn-ghost{background:transparent; color:var(--plum);}
+  .btn-line{background:transparent; color:var(--plum); border:1.5px solid var(--line);}
+  .btn-solid{background:var(--plum); color:var(--warm-white);}
+  .btn-solid:hover{background:var(--plum-deep);}
+  .btn-vendor{
+    background:var(--lime); color:var(--plum-deep);
+    box-shadow:0 2px 0 0 #D2B6AC;
+  }
+  .btn-hero{
+    background:var(--habanero); color:#fff;
+    font-size:16px; padding:15px 26px;
+    box-shadow:0 6px 0 0 var(--habanero-deep);
+  }
+  .btn-hero:active{box-shadow:0 2px 0 0 var(--habanero-deep); transform:translateY(4px);}
+
+  .menu-toggle{
+    display:flex; flex-direction:column; gap:4px;
+    background:none; border:none; cursor:pointer; padding:8px;
+  }
+  .menu-toggle span{width:20px; height:2px; background:var(--plum); border-radius:2px;}
+  .desktop-only{display:none;}
+  .mobile-menu{
+    display:none;
+    flex-direction:column; gap:8px;
+    padding:0 20px 18px;
+  }
+  .mobile-menu.open{display:flex;}
+  .mobile-menu .btn{width:100%; text-align:center;}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    position:relative;
+    padding:36px 20px 40px;
+    background:
+      radial-gradient(120% 90% at 15% -10%, rgba(198,87,122,0.14), transparent 55%),
+      radial-gradient(100% 80% at 100% 0%, rgba(231,212,206,0.45), transparent 50%),
+      var(--warm-white);
+    overflow:hidden;
+  }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px; font-weight:600; letter-spacing:0.02em;
+    background:var(--plum); color:var(--lime);
+    padding:6px 12px; border-radius:100px;
+    margin-bottom:18px;
+  }
+  .hero h1{
+    font-size:38px; line-height:1.05; font-weight:700;
+    color:var(--plum); letter-spacing:-0.02em;
+    max-width:520px;
+  }
+  .hero h1 .accent{color:var(--habanero);}
+  .hero p{
+    margin-top:16px; font-size:16px; line-height:1.55;
+    color:var(--ink-soft); max-width:440px;
+  }
+  .hero-ctas{display:flex; gap:12px; margin-top:26px; flex-wrap:wrap;}
+
+  .hero-grid{display:block; position:relative; z-index:2;}
+  .hero-photo{
+    position:relative; padding:0; overflow:hidden;
+    border-radius:0 0 28px 28px;
+    min-height:480px;
+    display:flex; align-items:flex-end;
+  }
+  .hero-bg-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;}
+  .hero-overlay{
+    position:absolute; inset:0; z-index:1;
+    background:linear-gradient(180deg, rgba(46,37,40,0.15) 0%, rgba(46,37,40,0.55) 55%, rgba(46,37,40,0.92) 100%);
+  }
+  .hero-photo .wrap{padding:0 20px 32px; width:100%;}
+  .hero-photo .eyebrow{background:rgba(251,238,236,0.16); color:var(--warm-white); backdrop-filter:blur(6px);}
+  h1.on-photo{color:#fff; max-width:480px;}
+  h1.on-photo .accent{color:#F3B9C7;}
+  p.on-photo{color:rgba(255,255,255,0.82); max-width:420px;}
+  .btn-line-photo{
+    background:rgba(255,255,255,0.1); color:#fff; border:1.5px solid rgba(255,255,255,0.5);
+    backdrop-filter:blur(6px); font-weight:600; font-size:14px; padding:15px 22px;
+    border-radius:100px;
+  }
+
+  /* categories photo grid */
+  .cat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px;}
+  .cat-card{
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    text-align:center;
+  }
+  .cat-card img{
+    width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:20px;
+    box-shadow:0 12px 24px -12px rgba(107,80,88,0.45);
+    transition:transform .18s ease;
+  }
+  .cat-card:active img{transform:scale(0.95);}
+  @media (hover:hover){ .cat-card:hover img{transform:translateY(-3px);} }
+  .cat-card-label{font-size:12.5px; font-weight:600; color:var(--plum);}
+  .collage-tall{grid-row:span 2; border-radius:var(--radius); overflow:hidden; aspect-ratio:1/1.25; box-shadow:0 18px 40px -14px rgba(107,80,88,0.35);}
+  .collage-small{border-radius:var(--radius); overflow:hidden; aspect-ratio:1/0.85; box-shadow:0 14px 30px -12px rgba(107,80,88,0.3);}
+  .hero-collage img{width:100%; height:100%; object-fit:cover;}
+
+  /* category pills */
+  .cat-scroll{
+    display:flex; gap:10px; overflow-x:auto;
+    padding:22px 20px 6px; margin:0 -20px;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  .cat-scroll::-webkit-scrollbar{display:none;}
+  .cat-pill{
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:8px;
+    padding:10px 16px; border-radius:100px;
+    background:#fff; border:1.5px solid var(--line);
+    font-size:14px; font-weight:600; color:var(--plum);
+    white-space:nowrap;
+  }
+  .cat-pill.active{background:var(--plum); color:var(--warm-white); border-color:var(--plum);}
+
+  /* ---------- Section shell ---------- */
+  section{padding:48px 20px;}
+  .section-head{margin-bottom:22px;}
+  .section-head .kicker{
+    font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
+    color:var(--habanero); text-transform:uppercase; letter-spacing:0.06em;
+  }
+  .section-head h2{
+    font-size:26px; font-weight:700; color:var(--plum);
+    margin-top:6px; letter-spacing:-0.01em;
+  }
+
+  /* ---------- How it works / ticket stub signature ---------- */
+  .how{background:var(--plum); border-radius:24px; margin:0 20px; padding:36px 22px; color:var(--warm-white);}
+  .how .section-head h2{color:var(--warm-white);}
+  .how .section-head .kicker{color:var(--lime);}
+  .how-steps{display:flex; flex-direction:column; gap:14px; margin-top:10px;}
+  .how-step{
+    display:flex; gap:14px; align-items:flex-start;
+    background:rgba(251,238,236,0.06);
+    border:1px solid rgba(251,238,236,0.12);
+    border-radius:14px; padding:16px;
+  }
+  .how-step .num{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px;
+    color:var(--plum-deep); background:var(--lime);
+    width:26px; height:26px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    flex:0 0 auto;
+  }
+  .how-step h3{font-size:15px; font-weight:600; margin-bottom:4px;}
+  .how-step p{font-size:13.5px; color:rgba(251,238,236,0.72); line-height:1.5;}
+
+  /* the ticket stub — signature element */
+  .ticket{
+    margin-top:24px;
+    background:var(--warm-white);
+    border-radius:16px;
+    position:relative;
+    display:flex; align-items:stretch;
+    color:var(--charcoal);
+    overflow:hidden;
+  }
+  .ticket-main{padding:18px; flex:1;}
+  .ticket-main .label{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft); letter-spacing:0.05em; text-transform:uppercase;}
+  .ticket-main .code{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--plum); margin-top:4px; letter-spacing:0.04em;}
+  .ticket-main .sub{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
+  .ticket-stub{
+    width:76px; flex:0 0 auto;
+    background:var(--lime);
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .ticket-stub span{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px;
+    color:var(--plum-deep); transform:rotate(90deg); white-space:nowrap;
+    letter-spacing:0.08em;
+  }
+  .ticket::before{
+    content:"";
+    position:absolute; left:calc(100% - 76px);
+    top:0; bottom:0; width:0;
+    border-left:2px dashed rgba(107,80,88,0.25);
+  }
+  .perf{
+    position:absolute; left:calc(100% - 76px); transform:translateX(-50%);
+    width:14px; height:14px; border-radius:50%; background:var(--warm-white);
+  }
+  .perf.top{top:-7px;} .perf.bot{bottom:-7px;}
+  .how > .perf{display:none;}
+
+  /* ---------- Stores grid ---------- */
+  .store-grid{
+    display:grid; grid-template-columns:1fr; gap:16px; margin-top:18px;
+  }
+  .store-card{
+    background:#fff; border-radius:var(--radius);
+    border:1px solid var(--line); overflow:hidden;
+    box-shadow:0 10px 26px -16px rgba(107,80,88,0.4);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .store-card:active{transform:scale(0.98);}
+  @media (hover:hover){
+    .store-card:hover{transform:translateY(-3px); box-shadow:0 18px 34px -14px rgba(107,80,88,0.4);}
+  }
+  .store-img{aspect-ratio:16/9; position:relative; display:flex; align-items:center; justify-content:center;}
+  .store-img img{width:100%; height:100%; object-fit:cover;}
+  .store-photo-emoji{font-size:44px; filter:drop-shadow(0 4px 10px rgba(0,0,0,0.15)); animation:sizzle 3s ease-in-out infinite;}
+  @keyframes sizzle{0%,100%{transform:scale(1) rotate(0deg);} 50%{transform:scale(1.08) rotate(-4deg);}}
+  .store-badge{
+    position:absolute; top:10px; left:10px;
+    background:rgba(26,21,32,0.75); color:#fff;
+    font-size:11px; font-weight:600; padding:5px 10px; border-radius:100px;
+    backdrop-filter:blur(4px);
+  }
+  .store-badge.rx{background:var(--plum);}
+  .store-body{padding:14px 16px 16px;}
+  .store-body h3{font-size:16px; font-weight:600; color:var(--charcoal);}
+  .store-meta{
+    display:flex; align-items:center; gap:10px; margin-top:6px;
+    font-size:12.5px; color:var(--ink-soft);
+  }
+  .store-meta .rating{color:var(--habanero-deep); font-weight:600;}
+  .store-tags{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
+  .tag{
+    font-size:11px; font-weight:600; color:var(--plum);
+    background:rgba(107,80,88,0.06); padding:4px 9px; border-radius:100px;
+  }
+
+  /* ---------- Vendor CTA banner ---------- */
+  .vendor-banner{
+    background:linear-gradient(135deg, var(--habanero), var(--habanero-deep));
+    border-radius:24px; margin:0 20px; padding:32px 22px; color:#fff;
+    position:relative; overflow:hidden;
+  }
+  .vendor-banner h2{font-size:24px; font-weight:700; max-width:340px; letter-spacing:-0.01em;}
+  .vendor-banner p{font-size:14.5px; margin-top:10px; max-width:380px; color:rgba(255,255,255,0.9); line-height:1.55;}
+  .split-row{display:flex; gap:10px; margin-top:20px;}
+  .split-chip{
+    background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.28);
+    border-radius:12px; padding:10px 14px; flex:1;
+  }
+  .split-chip .pct{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;}
+  .split-chip .who{font-size:11.5px; color:rgba(255,255,255,0.85); margin-top:2px;}
+  .vendor-banner .btn-hero{margin-top:22px; background:#fff; color:var(--habanero-deep); box-shadow:0 6px 0 0 rgba(0,0,0,0.15);}
+
+  /* ---------- Footer ---------- */
+  footer{padding:40px 20px 90px; text-align:center;}
+  footer .brand{justify-content:center; margin-bottom:10px;}
+  footer p{font-size:13px; color:var(--ink-soft);}
+
+  /* ---------- Mobile bottom nav (thumb-friendly) ---------- */
+  .bottom-nav{
+    position:fixed; bottom:0; left:0; right:0; z-index:60;
+    background:#fff; border-top:1px solid var(--line);
+    display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 16px rgba(107,80,88,0.06);
+  }
+  .bottom-nav a{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:10.5px; font-weight:600; color:var(--ink-soft); padding:4px 0;
+  }
+  .bottom-nav a.active{color:var(--habanero-deep);}
+  .bottom-nav .ico{width:20px; height:20px; border-radius:6px; background:currentColor; opacity:0.15;}
+  .bottom-nav a.active .ico{opacity:1; background:var(--habanero);}
+
+  /* ---------- Desktop / tablet up ---------- */
+  @media (min-width:760px){
+    .desktop-only{display:flex;}
+    .menu-toggle{display:none;}
+    .mobile-menu{display:none !important;}
+    .bottom-nav{display:none;}
+    .hero{padding:64px 20px 60px;}
+    .hero-photo{padding:0; min-height:560px;}
+    .hero-photo .wrap{padding:0 40px 48px;}
+    .hero .wrap{display:block;}
+    .hero h1{font-size:52px; max-width:none;}
+    h1.on-photo{max-width:640px;}
+    .hero p{font-size:17px; max-width:460px;}
+    .cat-scroll{padding-left:0; padding-right:0; margin:22px 0 0;}
+    .cat-grid{grid-template-columns:repeat(6,1fr);}
+    .store-grid{grid-template-columns:repeat(3,1fr);}
+    .how{padding:48px 40px;}
+    .how .wrap-inner{display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start;}
+    .vendor-banner{padding:44px 40px;}
+    .vendor-banner .wrap-inner{display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center;}
+    .vendor-banner .btn-hero{margin-top:0;}
+    section{padding:64px 20px;}
+  }
+  @media (min-width:1000px){
+    .hero h1{font-size:60px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{transition:none !important; animation:none !important;}
+  }
+
+  @keyframes floatIn{
+    from{opacity:0; transform:translateY(14px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  .hero .eyebrow, .hero h1, .hero p, .hero-ctas{
+    animation:floatIn .6s ease both;
+  }
+  .hero h1{animation-delay:.05s;}
+  .hero p{animation-delay:.12s;}
+  .hero-ctas{animation-delay:.18s;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav-row">
+    <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
+    <div class="desktop-only nav-actions">
+      <a href="order.html" class="btn btn-ghost">Continue as guest</a>
+      <a href="order.html" class="btn btn-line">Log in</a>
+      <a href="order.html" class="btn btn-solid">Sign up</a>
+      <a href="vendor.html" class="btn btn-vendor">Become a vendor</a>
+    </div>
+    <button class="menu-toggle" onclick="document.getElementById('mmenu').classList.toggle('open')" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="mobile-menu" id="mmenu">
+    <a href="vendor.html" class="btn btn-vendor">Become a vendor</a>
+    <a href="order.html" class="btn btn-solid">Sign up</a>
+    <a href="order.html" class="btn btn-line">Log in</a>
+    <a href="order.html" class="btn btn-ghost">Continue as guest</a>
+  </div>
+</header>
+
+<div class="hero hero-photo">
+  <img class="hero-bg-img" src="https://images.unsplash.com/photo-1767974968707-db3d448d4ef3?auto=format&fit=crop&w=1400&q=75" alt="">
+  <div class="hero-overlay"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">● Delivering across Sokoto</span>
+      <h1 class="on-photo">Everything you crave,<br>at your <span class="accent">door</span> —<br>or ready when you are.</h1>
+      <p class="on-photo">Local dishes, grills, drinks, and pharmacy essentials from Sokoto's best stores — track it live, or grab it yourself with a pickup code that's yours alone.</p>
+      <div class="hero-ctas">
+        <a href="order.html" class="btn btn-hero">Order now</a>
+        <a href="#how" class="btn btn-line-photo">How pickup works</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cat-scroll wrap" style="padding-left:20px; padding-right:20px; margin-top:18px;">
+  <div class="cat-pill active">🍢 All</div>
+  <div class="cat-pill">🍲 Local dishes</div>
+  <div class="cat-pill">🥘 Rice & swallow</div>
+  <div class="cat-pill">🍗 Grills & suya</div>
+  <div class="cat-pill">🧉 Drinks & fura</div>
+  <div class="cat-pill">💊 Pharmacy</div>
+</div>
+
+<section id="categories">
+  <div class="section-head">
+    <span class="kicker">Top picks</span>
+    <h2>Our categories</h2>
+  </div>
+  <div class="cat-grid">
+    <a href="#stores" class="cat-card">
+      <img src="https://images.unsplash.com/photo-1757715376249-b2a3e943cdf5?auto=format&fit=crop&w=500&q=70" alt="Local dishes and rice plate">
+      <span class="cat-card-label">Local dishes</span>
+    </a>
+    <a href="#stores" class="cat-card">
+      <img src="https://images.unsplash.com/photo-1767974968707-db3d448d4ef3?auto=format&fit=crop&w=500&q=70" alt="Grilled suya skewers">
+      <span class="cat-card-label">Grills & suya</span>
+    </a>
+    <a href="#stores" class="cat-card">
+      <img src="https://images.unsplash.com/photo-1616401616927-3c81de22dfa8?auto=format&fit=crop&w=500&q=70" alt="Roast chicken">
+      <span class="cat-card-label">Chicken</span>
+    </a>
+    <a href="#stores" class="cat-card">
+      <img src="https://images.unsplash.com/photo-1552286970-62449522d6f3?auto=format&fit=crop&w=500&q=70" alt="Smoothie drink">
+      <span class="cat-card-label">Drinks & fura</span>
+    </a>
+    <a href="#stores" class="cat-card">
+      <img src="https://images.unsplash.com/photo-1555526148-5cd740b44241?auto=format&fit=crop&w=500&q=70" alt="Desserts plate">
+      <span class="cat-card-label">Desserts</span>
+    </a>
+    <a href="#stores" class="cat-card">
+      <img src="https://images.unsplash.com/photo-1696861286643-341a8d7a79e9?auto=format&fit=crop&w=500&q=70" alt="Pharmacy shelf">
+      <span class="cat-card-label">Pharmacy</span>
+    </a>
+  </div>
+</section>
+
+<section id="stores">
+  <div class="section-head">
+    <span class="kicker">Open now near you</span>
+    <h2>Sokoto's favourite kitchens</h2>
+  </div>
+  <div class="store-grid" id="storeGrid">
+    <div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">Loading stores…</div>
+  </div>
+</section>
+
+<section id="how" class="how">
+  <div class="wrap-inner wrap">
+    <div>
+      <div class="section-head">
+        <span class="kicker">Pickup or delivery</span>
+        <h2>Your order, your code.</h2>
+      </div>
+      <div class="how-steps">
+        <div class="how-step">
+          <span class="num">1</span>
+          <div><h3>Order from a store near you</h3><p>Food or pharmacy — pay online, or pay on delivery once you've unlocked it.</p></div>
+        </div>
+        <div class="how-step">
+          <span class="num">2</span>
+          <div><h3>Choose delivery or pickup</h3><p>Pick a Sultini rider to bring it, or set a pickup time — now, in an hour, or whenever suits you.</p></div>
+        </div>
+        <div class="how-step">
+          <span class="num">3</span>
+          <div><h3>Show your code, collect your order</h3><p>Every order gets a one-time pickup code. No code, no mix-ups.</p></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="ticket">
+        <div class="ticket-main">
+          <div class="label">Pickup code</div>
+          <div class="code">SK · 7429</div>
+          <div class="sub">Ready in 12 min · Musa's Kitchen, Runjin Sambo</div>
+        </div>
+        <span class="perf top"></span>
+        <div class="ticket-stub"><span>SULTINI</span></div>
+        <span class="perf bot"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="vendors">
+  <div class="vendor-banner">
+    <div class="wrap-inner">
+      <div>
+        <h2>Own a restaurant or pharmacy? Get listed.</h2>
+        <p>Upload your menu, set what's in stock, and start taking orders. You keep the majority of every sale — we handle payments, delivery, and customers.</p>
+        <a href="vendor.html" class="btn btn-hero">Register your store</a>
+      </div>
+      <div class="split-row">
+        <div class="split-chip" style="flex:1;"><div class="who" style="font-size:13px; line-height:1.5;">Full payout details and terms are shared privately when you register.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
+  <p>Food & pharmacy delivery, made for Sokoto.</p>
+</footer>
+
+<nav class="bottom-nav">
+  <a href="index.html" class="active"><span class="ico"></span>Home</a>
+  <a href="order.html"><span class="ico"></span>Browse</a>
+  <a href="order.html"><span class="ico"></span>Orders</a>
+  <a href="order.html"><span class="ico"></span>Account</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script>
+async function loadHomepageStores(){
+  const { data: vendors } = await supabaseClient
+    .from('vendors').select('*').eq('status', 'approved').limit(6);
+  const grid = document.getElementById('storeGrid');
+  if(!vendors || vendors.length === 0){
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">No stores live yet — check back soon.</div>';
+    return;
+  }
+  grid.innerHTML = vendors.map(v => `
+    <a href="order.html" class="store-card" style="display:block;">
+      <div class="store-img">
+        <img src="${v.cover_image_url || ''}" alt="${v.name}" style="background:var(--stone);">
+        <span class="store-badge ${v.category==='pharmacy'?'rx':''}">${v.category==='pharmacy' ? 'Pharmacy · 20 min' : '15–25 min'}</span>
+      </div>
+      <div class="store-body">
+        <h3>${v.name}</h3>
+        <div class="store-meta"><span class="rating">★ ${v.rating || '—'}</span><span>· ${v.category}</span></div>
+      </div>
+    </a>
+  `).join('');
+}
+loadHomepageStores();
+</script>
+
+</body>
+</html>
