@@ -289,11 +289,12 @@ async function loadVendors(){
   if(!vendors || vendors.length===0){ el.innerHTML = '<div class="empty">No vendors yet.</div>'; return; }
   const pending = vendors.filter(v=>v.status==='pending');
   const live = vendors.filter(v=>v.status==='approved');
+  const photoImg = v => `<img src="${v.cover_image_url||''}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;background:var(--line);flex:0 0 auto;">`;
   el.innerHTML =
     `<div class="section-label">Pending approval (${pending.length})</div>` +
     pending.map(v => `
       <div class="card">
-        <div class="top"><div><h4>${v.name}</h4><div class="meta">${v.category} · ${v.address||''}</div></div><span class="pill pending">Pending</span></div>
+        <div class="top">${photoImg(v)}<div style="flex:1;"><h4>${v.name}</h4><div class="meta">${v.category} · ${v.address||''}</div></div><span class="pill pending">Pending</span></div>
         <div class="row-actions">
           <button class="danger" onclick="setVendorStatus('${v.id}','rejected')">Reject</button>
           <button class="primary" onclick="setVendorStatus('${v.id}','approved')">Approve</button>
@@ -301,7 +302,7 @@ async function loadVendors(){
       </div>`).join('') +
     `<div class="section-label">Live on the platform</div>` +
     (live.length ? live.map(v => `
-      <div class="card"><div class="top"><div><h4>${v.name}</h4><div class="meta">${v.category} · ${v.rating||0}★</div></div><span class="pill approved">Live</span></div></div>
+      <div class="card"><div class="top">${photoImg(v)}<div style="flex:1;"><h4>${v.name}</h4><div class="meta">${v.category} · ${v.rating||0}★</div></div><span class="pill approved">Live</span></div></div>
     `).join('') : '<div class="empty">None live yet.</div>');
 }
 async function setVendorStatus(id, status){
