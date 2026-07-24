@@ -113,6 +113,22 @@ export default async function handler(req, res) {
       }]),
     });
 
+    // Notify the admin by email — best-effort, doesn't block the order if it fails
+    try {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+        body: JSON.stringify({
+          from: 'Sultini Express <onboarding@resend.dev>',
+          to: ['sultiniexpress@yahoo.com'],
+          subject: `Sultini Express: New order ${pickupCode}`,
+          text: `A new order (${pickupCode}) worth ₦${order.total} was just placed and paid for.`,
+        }),
+      });
+    } catch (notifyErr) {
+      console.error('Notification failed', notifyErr);
+    }
+
     return res.status(200).json({ success: true, pickupCode, orderId: savedOrder.id });
   } catch (err) {
     console.error(err);
