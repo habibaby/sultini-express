@@ -67,6 +67,7 @@ export default async function handler(req, res) {
       body: JSON.stringify([{
         pickup_code: pickupCode,
         vendor_id: order.vendorId,
+        customer_id: order.customerId || null,
         fulfilment: order.fulfilment,
         pickup_time_choice: order.pickupTimeChoice || null,
         delivery_address: order.deliveryAddress || null,
