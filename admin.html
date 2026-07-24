@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sultini Express — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --plum:#6B5058; --plum-deep:#3E2E33;
+    --rose:#C6577A; --rose-deep:#A8425F;
+    --stone:#E7D4CE; --stone-deep:#D2B6AC;
+    --blush:#FBEEEC; --ink:#2E2528; --ink-soft:#8A7A7E;
+    --line:rgba(107,80,88,0.14); --radius:16px;
+    --green:#4E8B5C; --amber:#B8863C; --red:#B84C4C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Inter',sans-serif; background:var(--blush); color:var(--ink); -webkit-font-smoothing:antialiased; padding-bottom:90px;}
+  h1,h2,h3,.brand{font-family:'Fraunces',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit; text-decoration:none;}
+  img{display:block; max-width:100%;}
+  button, input, select{font-family:inherit; cursor:pointer;}
+
+  header{position:sticky; top:0; z-index:40; background:rgba(251,238,236,0.95); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+  .nav-row{display:flex; align-items:center; justify-content:space-between; padding:14px 18px;}
+  .brand{font-size:19px; font-weight:700; color:var(--plum); display:flex; align-items:center; gap:8px;}
+  .brand .dot{width:8px; height:8px; border-radius:50%; background:var(--rose);}
+  .tag-admin{font-size:11px; font-weight:700; color:#fff; background:var(--plum-deep); padding:5px 10px; border-radius:100px;}
+
+  .wrap{max-width:720px; margin:0 auto; padding:0 18px;}
+
+  /* bottom tab nav */
+  .bottom-nav{
+    position:fixed; bottom:0; left:0; right:0; z-index:50;
+    background:#fff; border-top:1px solid var(--line);
+    display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 16px rgba(107,80,88,0.06);
+  }
+  .bottom-nav button{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:10px; font-weight:700; color:var(--ink-soft); background:none; border:none; padding:4px 0;
+  }
+  .bottom-nav button .ic{font-size:17px;}
+  .bottom-nav button.active{color:var(--rose-deep);}
+  .badge-dot{position:relative;}
+  .badge-dot::after{content:attr(data-n); position:absolute; top:-4px; right:8px; background:var(--rose); color:#fff; font-size:9px; font-weight:700; width:15px; height:15px; border-radius:50%; display:flex; align-items:center; justify-content:center;}
+
+  .page{display:none; padding-top:18px;}
+  .page.active{display:block;}
+  .page-title{font-size:22px; font-weight:700; color:var(--plum); margin-bottom:4px;}
+  .page-sub{font-size:13px; color:var(--ink-soft); margin-bottom:20px;}
+
+  /* metrics */
+  .metric-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;}
+  .metric-card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px;}
+  .metric-card .n{font-family:'Fraunces',serif; font-size:24px; font-weight:700; color:var(--plum);}
+  .metric-card .l{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .metric-card.wide{grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; background:var(--plum); color:#fff;}
+  .metric-card.wide .n{color:#fff;}
+  .metric-card.wide .l{color:rgba(255,255,255,0.75);}
+
+  /* cards shared */
+  .card{background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .card h4{font-size:14.5px; font-weight:700;}
+  .card .meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .card .id{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft);}
+
+  .pill{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:100px; white-space:nowrap;}
+  .pill.pending{background:rgba(184,134,60,0.12); color:var(--amber);}
+  .pill.approved{background:rgba(78,139,92,0.12); color:var(--green);}
+  .pill.flag{background:rgba(184,76,76,0.12); color:var(--red);}
+  .pill.done{background:rgba(107,80,88,0.1); color:var(--plum);}
+
+  .row-actions{display:flex; gap:8px; margin-top:12px;}
+  .row-actions button{flex:1; padding:10px; border-radius:10px; font-size:12.5px; font-weight:700; border:1.5px solid var(--line); background:#fff; color:var(--plum);}
+  .row-actions button.primary{background:var(--rose); color:#fff; border-color:var(--rose);}
+  .row-actions button.danger{background:#fff; color:var(--red); border-color:rgba(184,76,76,0.3);}
+
+  .empty{text-align:center; color:var(--ink-soft); padding:40px 20px; font-size:13.5px;}
+
+  /* rider form */
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:700; color:var(--plum); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;}
+  .field input{width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;}
+  .field input:focus{outline:none; border-color:var(--rose);}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .btn{width:100%; padding:14px; border-radius:100px; border:none; font-weight:700; font-size:14.5px; background:var(--rose); color:#fff; box-shadow:0 5px 0 0 var(--rose-deep);}
+  .btn:active{box-shadow:0 1px 0 0 var(--rose-deep); transform:translateY(4px);}
+
+  .rider-row{display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px;}
+  .rider-row .n{font-size:13.5px; font-weight:700;}
+  .rider-row .m{font-size:11.5px; color:var(--ink-soft);}
+
+  .section-label{font-size:13px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:22px 0 10px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav-row">
+    <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
+    <span class="tag-admin">Admin</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- AUTH GATE -->
+<section class="page active" id="page-auth">
+  <div class="page-title">Admin log in</div>
+  <div class="page-sub">Only accounts marked as admin can access this dashboard.</div>
+  <div class="field"><label>Email</label><input type="email" id="aAuthEmail"></div>
+  <div class="field"><label>Password</label><input type="password" id="aAuthPassword"></div>
+  <button class="btn" onclick="adminLogin()">Log in</button>
+  <div id="aAuthError" style="color:var(--red); font-size:12.5px; margin-top:10px;"></div>
+</section>
+
+<!-- OVERVIEW -->
+<section class="page" id="page-overview">
+  <div class="page-title">Overview</div>
+  <div class="page-sub">Today at a glance</div>
+  <div class="metric-grid" id="metricGrid">
+    <div class="metric-card wide"><div class="l">Loading metrics…</div></div>
+  </div>
+
+  <div class="section-label">Needs your attention</div>
+  <div id="attentionContainer">Loading…</div>
+</section>
+
+<!-- VENDORS -->
+<section class="page" id="page-vendors">
+  <div class="page-title">Vendors</div>
+  <div class="page-sub">Approve new stores before they go live</div>
+  <div id="vendorsContainer">Loading…</div>
+</section>
+
+<!-- ORDERS -->
+<section class="page" id="page-orders">
+  <div class="page-title">Orders</div>
+  <div class="page-sub">All orders across every store, with disputes flagged</div>
+  <div id="ordersContainer">Loading…</div>
+</section>
+
+<!-- PAYOUTS -->
+<section class="page" id="page-payouts">
+  <div class="page-title">Cash-outs</div>
+  <div class="page-sub">Approve after the 1-day dispute window has passed</div>
+  <div id="payoutsContainer">Loading…</div>
+</section>
+
+<!-- RIDERS -->
+<section class="page" id="page-riders">
+  <div class="page-title">Riders</div>
+  <div class="page-sub">Riders are added manually — there's no self-signup</div>
+
+  <div class="field">
+    <label>Full name</label>
+    <input type="text" placeholder="e.g. Ibrahim Musa" id="riderName">
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label>Phone number</label>
+      <input type="tel" placeholder="080X XXX XXXX" id="riderPhone">
+    </div>
+    <div class="field">
+      <label>Vehicle</label>
+      <input type="text" placeholder="e.g. Okada" id="riderVehicle">
+    </div>
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label>Bank name</label>
+      <input type="text" placeholder="e.g. GTBank" id="riderBank">
+    </div>
+    <div class="field">
+      <label>Account number</label>
+      <input type="text" placeholder="0123456789" id="riderAcct">
+    </div>
+  </div>
+  <button class="btn" onclick="addRider()">Add rider</button>
+
+  <div class="section-label">Active riders</div>
+  <div id="riderList"></div>
+</section>
+
+</div>
+
+<div class="bottom-nav">
+  <button class="active" data-p="overview" onclick="go('overview')"><span class="ic">📊</span>Overview</button>
+  <button class="badge-dot" data-n="3" data-p="vendors" onclick="go('vendors')"><span class="ic">🏪</span>Vendors</button>
+  <button data-p="orders" onclick="go('orders')"><span class="ic">🧾</span>Orders</button>
+  <button class="badge-dot" data-n="2" data-p="payouts" onclick="go('payouts')"><span class="ic">💳</span>Payouts</button>
+  <button data-p="riders" onclick="go('riders')"><span class="ic">🛵</span>Riders</button>
+</div>
+
+<script src="supabase-config.js"></script>
+<script>
+function go(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active', b.dataset.p===page));
+  window.scrollTo(0,0);
+}
+
+async function adminLogin(){
+  const email = document.getElementById('aAuthEmail').value.trim();
+  const password = document.getElementById('aAuthPassword').value;
+  const err = document.getElementById('aAuthError');
+  err.textContent = '';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){ err.textContent = error.message; return; }
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+  if(!profile || profile.role !== 'admin'){
+    err.textContent = "This account isn't an admin. Access denied.";
+    await supabaseClient.auth.signOut();
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-overview').classList.add('active');
+  loadEverything();
+}
+
+async function loadEverything(){
+  await loadVendors();
+  await loadOrders();
+  await loadPayouts();
+  await loadRiders();
+  await loadOverview();
+}
+
+// ---- Overview ----
+async function loadOverview(){
+  const [{ data: allOrders }, { data: pendingVendors }, { data: activeRiders }, { data: pendingLedger }] = await Promise.all([
+    supabaseClient.from('orders').select('total, created_at'),
+    supabaseClient.from('vendors').select('id').eq('status', 'pending'),
+    supabaseClient.from('riders').select('id').eq('active', true),
+    supabaseClient.from('ledger_entries').select('id, amount').eq('status', 'available')
+  ]);
+
+  const orders = allOrders || [];
+  const todayStr = new Date().toDateString();
+  const ordersToday = orders.filter(o => new Date(o.created_at).toDateString() === todayStr).length;
+
+  const weekAgo = Date.now() - 7*24*60*60*1000;
+  const weekOrders = orders.filter(o => new Date(o.created_at).getTime() >= weekAgo);
+  const grossThisWeek = weekOrders.reduce((s,o)=>s+Number(o.total),0);
+  const platformShareEstimate = Math.round(grossThisWeek * 0.2);
+
+  const pendingCashoutTotal = (pendingLedger || []).reduce((s,e)=>s+Number(e.amount),0);
+
+  document.getElementById('metricGrid').innerHTML = `
+    <div class="metric-card wide">
+      <div><div class="n">₦${grossThisWeek.toLocaleString()}</div><div class="l">Gross order value, this week</div></div>
+      <div style="text-align:right;"><div class="n">₦${platformShareEstimate.toLocaleString()}</div><div class="l">Platform earnings (20%, est.)</div></div>
+    </div>
+    <div class="metric-card"><div class="n">${ordersToday}</div><div class="l">Orders today</div></div>
+    <div class="metric-card"><div class="n">${(pendingVendors||[]).length}</div><div class="l">Vendors pending review</div></div>
+    <div class="metric-card"><div class="n">${(activeRiders||[]).length}</div><div class="l">Active riders</div></div>
+    <div class="metric-card"><div class="n">₦${pendingCashoutTotal.toLocaleString()}</div><div class="l">Cash-outs pending approval</div></div>
+  `;
+
+  // Attention feed: pending vendors + available cash-outs, most recent first
+  const { data: vendorsPending } = await supabaseClient.from('vendors').select('id, name, category').eq('status','pending').limit(3);
+  const { data: ledgerPending } = await supabaseClient.from('ledger_entries').select('id, amount, vendors(name), riders(full_name), recipient_type').eq('status','available').limit(3);
+
+  let cards = '';
+  (vendorsPending||[]).forEach(v => {
+    cards += `<div class="card"><div class="top"><div><h4>${v.name}</h4><div class="meta">New vendor application · ${v.category}</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('vendors')">Review</button></div></div>`;
+  });
+  (ledgerPending||[]).forEach(e => {
+    const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    cards += `<div class="card"><div class="top"><div><h4>Cash-out · ${who}</h4><div class="meta">₦${Number(e.amount).toLocaleString()} requested · dispute window clear</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('payouts')">Review</button></div></div>`;
+  });
+  document.getElementById('attentionContainer').innerHTML = cards || '<div class="empty">Nothing needs attention right now.</div>';
+}
+
+// ---- Vendors ----
+async function loadVendors(){
+  const { data: vendors } = await supabaseClient.from('vendors').select('*').order('created_at', {ascending:false});
+  const el = document.getElementById('vendorsContainer');
+  if(!vendors || vendors.length===0){ el.innerHTML = '<div class="empty">No vendors yet.</div>'; return; }
+  const pending = vendors.filter(v=>v.status==='pending');
+  const live = vendors.filter(v=>v.status==='approved');
+  el.innerHTML =
+    `<div class="section-label">Pending approval (${pending.length})</div>` +
+    pending.map(v => `
+      <div class="card">
+        <div class="top"><div><h4>${v.name}</h4><div class="meta">${v.category} · ${v.address||''}</div></div><span class="pill pending">Pending</span></div>
+        <div class="row-actions">
+          <button class="danger" onclick="setVendorStatus('${v.id}','rejected')">Reject</button>
+          <button class="primary" onclick="setVendorStatus('${v.id}','approved')">Approve</button>
+        </div>
+      </div>`).join('') +
+    `<div class="section-label">Live on the platform</div>` +
+    (live.length ? live.map(v => `
+      <div class="card"><div class="top"><div><h4>${v.name}</h4><div class="meta">${v.category} · ${v.rating||0}★</div></div><span class="pill approved">Live</span></div></div>
+    `).join('') : '<div class="empty">None live yet.</div>');
+}
+async function setVendorStatus(id, status){
+  await supabaseClient.from('vendors').update({ status }).eq('id', id);
+  await loadVendors();
+}
+
+// ---- Orders ----
+async function loadOrders(){
+  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name)').order('created_at',{ascending:false}).limit(30);
+  const el = document.getElementById('ordersContainer');
+  if(!orders || orders.length===0){ el.innerHTML = '<div class="empty">No orders yet.</div>'; return; }
+  el.innerHTML = orders.map(o => `
+    <div class="card">
+      <div class="top">
+        <div><div class="id">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4><div class="meta">${o.fulfilment} · ${o.status}</div></div>
+        <span class="pill ${o.status==='delivered'||o.status==='picked_up'||o.status==='completed'?'approved':'done'}">${o.status}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ---- Payouts ----
+async function loadPayouts(){
+  const { data: entries } = await supabaseClient
+    .from('ledger_entries').select('*, vendors(name), riders(full_name)')
+    .in('status', ['available','cashout_requested','in_dispute_window'])
+    .order('created_at', {ascending:false}).limit(30);
+  const el = document.getElementById('payoutsContainer');
+  if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No pending cash-outs.</div>'; return; }
+  el.innerHTML = entries.map(e => {
+    const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    if(e.status==='in_dispute_window'){
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Still in dispute window</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
+    }
+    return `<div class="card">
+      <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Dispute window clear</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="row-actions">
+        <button class="danger" onclick="setLedgerStatus('${e.id}','held')">Hold</button>
+        <button class="primary" onclick="setLedgerStatus('${e.id}','paid')">Approve payout</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function setLedgerStatus(id, status){
+  await supabaseClient.from('ledger_entries').update({ status, paid_at: status==='paid' ? new Date().toISOString() : null }).eq('id', id);
+  await loadPayouts();
+}
+
+// ---- Riders ----
+async function loadRiders(){
+  const { data: riders } = await supabaseClient.from('riders').select('*').order('created_at',{ascending:false});
+  const el = document.getElementById('riderList');
+  if(!riders || riders.length===0){ el.innerHTML = '<div class="empty">No riders added yet.</div>'; return; }
+  el.innerHTML = riders.map(r=>`
+    <div class="rider-row">
+      <div><div class="n">${r.full_name}</div><div class="m">${r.vehicle||'—'} · ${r.phone}</div></div>
+      <span class="pill ${r.active?'approved':'flag'}">${r.active?'Active':'Inactive'}</span>
+    </div>`).join('');
+}
+async function addRider(){
+  const full_name = document.getElementById('riderName').value.trim();
+  const phone = document.getElementById('riderPhone').value.trim();
+  const vehicle = document.getElementById('riderVehicle').value.trim();
+  const bank_name = document.getElementById('riderBank').value.trim();
+  const account_number = document.getElementById('riderAcct').value.trim();
+  if(!full_name || !phone) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  await supabaseClient.from('riders').insert([{ full_name, phone, vehicle, bank_name, account_number, added_by: session.user.id }]);
+  document.getElementById('riderName').value='';
+  document.getElementById('riderPhone').value='';
+  document.getElementById('riderVehicle').value='';
+  document.getElementById('riderBank').value='';
+  document.getElementById('riderAcct').value='';
+  await loadRiders();
+}
+
+supabaseClient.auth.getSession().then(({data:{session}}) => {
+  if(session) adminLogin(); // will re-check role; harmless if already logged in
+});
+</script>
+
+</body>
+</html>
