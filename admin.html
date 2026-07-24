@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sultini Express — Vendor</title>
+<title>Sultini Express — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -14,697 +14,426 @@
     --rose:#C6577A; --rose-deep:#A8425F;
     --stone:#E7D4CE; --stone-deep:#D2B6AC;
     --blush:#FBEEEC; --ink:#2E2528; --ink-soft:#8A7A7E;
-    --line:rgba(107,80,88,0.14); --radius:18px;
+    --line:rgba(107,80,88,0.14); --radius:16px;
     --green:#4E8B5C; --amber:#B8863C; --red:#B84C4C;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{font-family:'Inter',sans-serif; background:var(--blush); color:var(--ink); -webkit-font-smoothing:antialiased; padding-bottom:80px;}
+  body{font-family:'Inter',sans-serif; background:var(--blush); color:var(--ink); -webkit-font-smoothing:antialiased; padding-bottom:90px;}
   h1,h2,h3,.brand{font-family:'Fraunces',serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
   a{color:inherit; text-decoration:none;}
   img{display:block; max-width:100%;}
-  button, input, select, textarea{font-family:inherit;}
-  button{cursor:pointer;}
+  button, input, select{font-family:inherit; cursor:pointer;}
 
   header{position:sticky; top:0; z-index:40; background:rgba(251,238,236,0.95); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
   .nav-row{display:flex; align-items:center; justify-content:space-between; padding:14px 18px;}
   .brand{font-size:19px; font-weight:700; color:var(--plum); display:flex; align-items:center; gap:8px;}
   .brand .dot{width:8px; height:8px; border-radius:50%; background:var(--rose);}
-  .back-btn{width:36px; height:36px; border-radius:50%; background:#fff; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--plum);}
-  .tag-vendor{font-size:11px; font-weight:700; color:var(--plum); background:var(--stone); padding:5px 10px; border-radius:100px;}
+  .tag-admin{font-size:11px; font-weight:700; color:#fff; background:var(--plum-deep); padding:5px 10px; border-radius:100px;}
 
-  .wrap{max-width:640px; margin:0 auto; padding:0 18px;}
+  .wrap{max-width:720px; margin:0 auto; padding:0 18px;}
 
-  .screen{display:none;}
-  .screen.active{display:block;}
-
-  /* ---- progress ---- */
-  .progress{display:flex; gap:6px; margin:18px 0 22px;}
-  .progress .seg{flex:1; height:4px; border-radius:4px; background:var(--line);}
-  .progress .seg.done{background:var(--rose);}
-
-  .step-title{font-size:22px; font-weight:700; color:var(--plum); margin-bottom:4px;}
-  .step-sub{font-size:13.5px; color:var(--ink-soft); margin-bottom:20px;}
-
-  .field{margin-bottom:16px;}
-  .field label{display:block; font-size:12.5px; font-weight:700; color:var(--plum); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;}
-  .field input, .field select, .field textarea{
-    width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line);
-    background:#fff; font-size:14px; color:var(--ink);
+  /* bottom tab nav */
+  .bottom-nav{
+    position:fixed; bottom:0; left:0; right:0; z-index:50;
+    background:#fff; border-top:1px solid var(--line);
+    display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 16px rgba(107,80,88,0.06);
   }
-  .field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--rose);}
-  .field-row{display:flex; gap:12px;}
+  .bottom-nav button{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:10px; font-weight:700; color:var(--ink-soft); background:none; border:none; padding:4px 0;
+  }
+  .bottom-nav button .ic{font-size:17px;}
+  .bottom-nav button.active{color:var(--rose-deep);}
+  .badge-dot{position:relative;}
+  .badge-dot::after{content:attr(data-n); position:absolute; top:-4px; right:8px; background:var(--rose); color:#fff; font-size:9px; font-weight:700; width:15px; height:15px; border-radius:50%; display:flex; align-items:center; justify-content:center;}
+
+  .page{display:none; padding-top:18px;}
+  .page.active{display:block;}
+  .page-title{font-size:22px; font-weight:700; color:var(--plum); margin-bottom:4px;}
+  .page-sub{font-size:13px; color:var(--ink-soft); margin-bottom:20px;}
+
+  /* metrics */
+  .metric-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;}
+  .metric-card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px;}
+  .metric-card .n{font-family:'Fraunces',serif; font-size:24px; font-weight:700; color:var(--plum);}
+  .metric-card .l{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .metric-card.wide{grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; background:var(--plum); color:#fff;}
+  .metric-card.wide .n{color:#fff;}
+  .metric-card.wide .l{color:rgba(255,255,255,0.75);}
+
+  /* cards shared */
+  .card{background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .card h4{font-size:14.5px; font-weight:700;}
+  .card .meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .card .id{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft);}
+
+  .pill{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:100px; white-space:nowrap;}
+  .pill.pending{background:rgba(184,134,60,0.12); color:var(--amber);}
+  .pill.approved{background:rgba(78,139,92,0.12); color:var(--green);}
+  .pill.flag{background:rgba(184,76,76,0.12); color:var(--red);}
+  .pill.done{background:rgba(107,80,88,0.1); color:var(--plum);}
+
+  .row-actions{display:flex; gap:8px; margin-top:12px;}
+  .row-actions button{flex:1; padding:10px; border-radius:10px; font-size:12.5px; font-weight:700; border:1.5px solid var(--line); background:#fff; color:var(--plum);}
+  .row-actions button.primary{background:var(--rose); color:#fff; border-color:var(--rose);}
+  .row-actions button.danger{background:#fff; color:var(--red); border-color:rgba(184,76,76,0.3);}
+
+  .empty{text-align:center; color:var(--ink-soft); padding:40px 20px; font-size:13.5px;}
+
+  /* rider form */
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:700; color:var(--plum); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;}
+  .field input{width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;}
+  .field input:focus{outline:none; border-color:var(--rose);}
+  .field-row{display:flex; gap:10px;}
   .field-row .field{flex:1;}
+  .btn{width:100%; padding:14px; border-radius:100px; border:none; font-weight:700; font-size:14.5px; background:var(--rose); color:#fff; box-shadow:0 5px 0 0 var(--rose-deep);}
+  .btn:active{box-shadow:0 1px 0 0 var(--rose-deep); transform:translateY(4px);}
 
-  .cat-select-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .cat-select{padding:14px; border-radius:14px; border:1.5px solid var(--line); background:#fff; text-align:left; font-size:13.5px; font-weight:600;}
-  .cat-select.selected{border-color:var(--rose); background:rgba(198,87,122,0.06); color:var(--rose-deep);}
+  .rider-row{display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px;}
+  .rider-row .n{font-size:13.5px; font-weight:700;}
+  .rider-row .m{font-size:11.5px; color:var(--ink-soft);}
 
-  /* ---- menu builder ---- */
-  .menu-draft-item{display:flex; gap:10px; align-items:center; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:10px; margin-bottom:10px;}
-  .photo-upload{width:52px; height:52px; border-radius:10px; background:var(--stone); display:flex; align-items:center; justify-content:center; font-size:18px; flex:0 0 auto; color:var(--plum-deep);}
-  .menu-draft-body{flex:1; min-width:0;}
-  .menu-draft-body .n{font-size:13.5px; font-weight:700;}
-  .menu-draft-body .p{font-size:12px; color:var(--ink-soft);}
-  .stock-toggle{display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--green);}
-  .remove-item{width:28px; height:28px; border-radius:8px; border:1.5px solid var(--line); background:#fff; color:var(--ink-soft); font-size:14px;}
-  .add-item-btn{width:100%; padding:13px; border-radius:12px; border:1.5px dashed var(--rose); background:transparent; color:var(--rose-deep); font-weight:700; font-size:13.5px;}
-
-  /* ---- split disclosure ---- */
-  .split-box{background:var(--plum); color:#fff; border-radius:16px; padding:18px; margin:20px 0;}
-  .split-box h3{font-size:15px; margin-bottom:10px;}
-  .split-row{display:flex; gap:10px; margin-bottom:12px;}
-  .split-chip{flex:1; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:12px; padding:10px;}
-  .split-chip .pct{font-family:'Fraunces',serif; font-size:22px; font-weight:700;}
-  .split-chip .who{font-size:11px; color:rgba(255,255,255,0.8);}
-  .split-box p{font-size:12px; color:rgba(255,255,255,0.85); line-height:1.5;}
-  .agree-row{display:flex; align-items:flex-start; gap:10px; margin-top:16px; font-size:13px; color:var(--ink-soft);}
-  .agree-row input{margin-top:2px;}
-
-  .btn{width:100%; padding:15px; border-radius:100px; border:none; font-weight:700; font-size:15px; text-align:center;}
-  .btn-primary{background:var(--rose); color:#fff; box-shadow:0 6px 0 0 var(--rose-deep);}
-  .btn-primary:active{box-shadow:0 2px 0 0 var(--rose-deep); transform:translateY(4px);}
-  .btn-primary.disabled{background:var(--line); box-shadow:none; color:var(--ink-soft); pointer-events:none;}
-  .btn-secondary{background:#fff; color:var(--plum); border:1.5px solid var(--line);}
-
-  /* ---- pending screen ---- */
-  .confirm-wrap{text-align:center; padding-top:40px;}
-  .confirm-icon{width:64px; height:64px; border-radius:50%; background:var(--amber); color:#fff; font-size:28px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;}
-
-  /* ---- dashboard ---- */
-  .tabs{display:flex; gap:8px; margin:16px 0 20px; background:#fff; border:1px solid var(--line); border-radius:100px; padding:4px;}
-  .tab{flex:1; text-align:center; padding:10px; border-radius:100px; font-size:13px; font-weight:700; color:var(--ink-soft);}
-  .tab.active{background:var(--plum); color:#fff;}
-
-  .order-card{background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
-  .order-card .top{display:flex; justify-content:space-between; align-items:flex-start;}
-  .order-card .oid{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);}
-  .order-card h4{font-size:14.5px; margin-top:2px;}
-  .status-pill{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:100px;}
-  .status-pill.new{background:rgba(198,87,122,0.12); color:var(--rose-deep);}
-  .status-pill.preparing{background:rgba(184,134,60,0.12); color:var(--amber);}
-  .status-pill.ready{background:rgba(78,139,92,0.12); color:var(--green);}
-  .order-items{font-size:12.5px; color:var(--ink-soft); margin:8px 0;}
-  .order-actions{display:flex; gap:8px; margin-top:10px;}
-  .order-actions button{flex:1; padding:10px; border-radius:10px; font-size:12.5px; font-weight:700; border:1.5px solid var(--line); background:#fff; color:var(--plum);}
-  .order-actions button.primary{background:var(--rose); color:#fff; border-color:var(--rose);}
-
-  .menu-manage-item{display:flex; gap:10px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:10px;}
-  .menu-manage-item img{width:52px; height:52px; border-radius:10px; object-fit:cover; flex:0 0 auto;}
-  .menu-manage-body{flex:1; min-width:0;}
-  .menu-manage-body .n{font-size:13.5px; font-weight:700;}
-  .menu-manage-body .p{font-size:12px; color:var(--ink-soft);}
-  .switch{position:relative; width:42px; height:24px; border-radius:100px; background:var(--line); flex:0 0 auto; border:none;}
-  .switch.on{background:var(--green);}
-  .switch::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s;}
-  .switch.on::after{transform:translateX(18px);}
-
-  .earn-card{background:var(--plum); color:#fff; border-radius:18px; padding:20px; margin-bottom:16px;}
-  .earn-card .label{font-size:12px; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.04em;}
-  .earn-card .amt{font-family:'Fraunces',serif; font-size:32px; font-weight:700; margin-top:4px;}
-  .earn-sub{display:flex; gap:10px; margin-top:14px;}
-  .earn-sub-chip{flex:1; background:rgba(255,255,255,0.1); border-radius:10px; padding:10px;}
-  .earn-sub-chip .n{font-size:15px; font-weight:700;}
-  .earn-sub-chip .l{font-size:10.5px; color:rgba(255,255,255,0.75);}
-
-  .payout-row{display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px; font-size:13px;}
-  .payout-row .amt{font-weight:700;}
-  .payout-status{font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:100px;}
-  .payout-status.paid{background:rgba(78,139,92,0.12); color:var(--green);}
-  .payout-status.pending{background:rgba(184,134,60,0.12); color:var(--amber);}
-
-  .note{font-size:12px; color:var(--ink-soft); background:rgba(107,80,88,0.06); border-radius:10px; padding:10px 12px; margin:12px 0;}
+  .section-label{font-size:13px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:22px 0 10px;}
 </style>
 </head>
 <body>
 
 <header>
   <div class="nav-row">
-    <button class="back-btn" id="backBtn" style="visibility:hidden;">←</button>
     <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
-    <span class="tag-vendor">Vendor</span>
+    <span class="tag-admin">Admin</span>
   </div>
 </header>
 
 <div class="wrap">
 
 <!-- AUTH GATE -->
-<section class="screen active" id="screen-auth">
-  <div class="step-title">Vendor log in</div>
-  <div class="step-sub">Log in or create an account to register your store.</div>
-  <div class="field"><label>Email</label><input type="email" id="vAuthEmail"></div>
-  <div class="field"><label>Password</label><input type="password" id="vAuthPassword"></div>
-  <button class="btn btn-primary" onclick="vendorLogin()" style="margin-bottom:10px;">Log in</button>
-  <button class="btn btn-secondary" onclick="vendorSignup()">Sign up instead</button>
-  <div id="vAuthError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
+<section class="page active" id="page-auth">
+  <div class="page-title">Admin log in</div>
+  <div class="page-sub">Only accounts marked as admin can access this dashboard.</div>
+  <div class="field"><label>Email</label><input type="email" id="aAuthEmail"></div>
+  <div class="field"><label>Password</label><input type="password" id="aAuthPassword"></div>
+  <button class="btn" onclick="adminLogin()">Log in</button>
+  <div id="aAuthError" style="color:var(--red); font-size:12.5px; margin-top:10px;"></div>
 </section>
 
-<!-- STEP 1: BUSINESS DETAILS -->
-<section class="screen" id="screen-step1">
-  <div class="progress"><div class="seg done"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
-  <div class="step-title">Tell us about your store</div>
-  <div class="step-sub">This is what customers will see first.</div>
+<!-- OVERVIEW -->
+<section class="page" id="page-overview">
+  <div class="page-title">Overview</div>
+  <div class="page-sub">Today at a glance</div>
+  <div class="metric-grid" id="metricGrid">
+    <div class="metric-card wide"><div class="l">Loading metrics…</div></div>
+  </div>
+
+  <div class="section-label">Needs your attention</div>
+  <div id="attentionContainer">Loading…</div>
+</section>
+
+<!-- VENDORS -->
+<section class="page" id="page-vendors">
+  <div class="page-title">Vendors</div>
+  <div class="page-sub">Approve new stores before they go live</div>
+  <div id="vendorsContainer">Loading…</div>
+</section>
+
+<!-- ORDERS -->
+<section class="page" id="page-orders">
+  <div class="page-title">Orders</div>
+  <div class="page-sub">All orders across every store, with disputes flagged</div>
+  <div id="ordersContainer">Loading…</div>
+</section>
+
+<!-- PAYOUTS -->
+<section class="page" id="page-payouts">
+  <div class="page-title">Cash-outs</div>
+  <div class="page-sub">Approve after the 1-day dispute window has passed</div>
+  <div id="payoutsContainer">Loading…</div>
+</section>
+
+<!-- RIDERS -->
+<section class="page" id="page-riders">
+  <div class="page-title">Riders</div>
+  <div class="page-sub">Riders are added manually — there's no self-signup</div>
 
   <div class="field">
-    <label>Store name</label>
-    <input type="text" placeholder="e.g. Musa's Kitchen" id="bizName">
-  </div>
-  <div class="field">
-    <label>Store photo</label>
-    <label class="photo-upload" style="cursor:pointer; width:100%; height:110px; border-radius:14px;">
-      <span id="bizPhotoLabel">📷 This shows next to your store name everywhere</span>
-      <input type="file" accept="image/*" style="display:none;" id="bizPhotoInput" onchange="previewBizPhoto(this)">
-    </label>
-  </div>
-  <div class="field">
-    <label>Store type</label>
-    <div class="cat-select-grid">
-      <button class="cat-select" data-cat="restaurant">🍲 Restaurant</button>
-      <button class="cat-select" data-cat="pharmacy">💊 Pharmacy</button>
-    </div>
+    <label>Full name</label>
+    <input type="text" placeholder="e.g. Ibrahim Musa" id="riderName">
   </div>
   <div class="field-row">
     <div class="field">
       <label>Phone number</label>
-      <input type="tel" placeholder="080X XXX XXXX" id="bizPhone">
+      <input type="tel" placeholder="080X XXX XXXX" id="riderPhone">
     </div>
     <div class="field">
-      <label>WhatsApp (optional)</label>
-      <input type="tel" placeholder="080X XXX XXXX" id="bizWhatsapp">
+      <label>Vehicle</label>
+      <input type="text" placeholder="e.g. Okada" id="riderVehicle">
     </div>
-  </div>
-  <div class="field">
-    <label>Store address</label>
-    <textarea rows="2" placeholder="e.g. No. 12 Runjin Sambo Road, Sokoto" id="bizAddress"></textarea>
-  </div>
-
-  <button class="btn btn-primary" onclick="goStep(2)">Continue</button>
-</section>
-
-<!-- STEP 2: MENU SETUP -->
-<section class="screen" id="screen-step2">
-  <div class="progress"><div class="seg done"></div><div class="seg done"></div><div class="seg"></div><div class="seg"></div></div>
-  <div class="step-title">Add your first items</div>
-  <div class="step-sub">You can add photos and edit stock status any time from your dashboard.</div>
-
-  <div id="menuDraftList"></div>
-  <button class="add-item-btn" onclick="addDraftItem()">＋ Add menu item</button>
-
-  <div style="margin-top:20px;">
-    <button class="btn btn-primary" onclick="goStep(3)">Continue</button>
-  </div>
-</section>
-
-<!-- STEP 3: PAYOUT + SPLIT -->
-<section class="screen" id="screen-step3">
-  <div class="progress"><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div><div class="seg"></div></div>
-  <div class="step-title">Payout details</div>
-  <div class="step-sub">Where your earnings are sent when you cash out.</div>
-
-  <div class="field">
-    <label>Bank name</label>
-    <input type="text" placeholder="e.g. Access Bank" id="bankName">
   </div>
   <div class="field-row">
     <div class="field">
-      <label>Account number</label>
-      <input type="text" placeholder="0123456789" id="acctNumber">
+      <label>Bank name</label>
+      <input type="text" placeholder="e.g. GTBank" id="riderBank">
     </div>
     <div class="field">
-      <label>Account name</label>
-      <input type="text" placeholder="Must match store owner" id="acctName">
+      <label>Account number</label>
+      <input type="text" placeholder="0123456789" id="riderAcct">
     </div>
   </div>
+  <button class="btn" onclick="addRider()">Add rider</button>
 
-  <div class="split-box">
-    <h3>How you get paid</h3>
-    <div class="split-row">
-      <div class="split-chip"><div class="pct">80%</div><div class="who">goes to you</div></div>
-      <div class="split-chip"><div class="pct">20%</div><div class="who">platform fee</div></div>
-    </div>
-    <p>Every payment goes through Sultini's Paystack account. Your 80% builds up in your Sultini balance. If there's no dispute within 1 day of an order, you can request a cash-out the next day — Sultini reviews and pays it to the account above.</p>
-  </div>
-
-  <label class="agree-row">
-    <input type="checkbox" id="agreeCheck" onchange="toggleSubmit()">
-    <span>I understand and agree to the 80/20 revenue split and payout terms above.</span>
-  </label>
-
-  <div style="margin-top:16px;">
-    <button class="btn btn-primary disabled" id="submitBtn" onclick="submitRegistration()">Submit for review</button>
-  </div>
-</section>
-
-<!-- PENDING -->
-<section class="screen" id="screen-pending">
-  <div class="confirm-wrap">
-    <div class="confirm-icon">⏳</div>
-    <h2 style="font-size:22px; color:var(--plum);">Submitted for review</h2>
-    <p style="color:var(--ink-soft); font-size:14px; margin-top:8px; max-width:340px; margin-left:auto; margin-right:auto;">
-      Sultini reviews new stores before they go live. You'll be notified once approved — usually within a day.
-    </p>
-    <button class="btn btn-primary" style="margin-top:30px;" onclick="goDashboard()">Preview my dashboard →</button>
-  </div>
-</section>
-
-<!-- DASHBOARD -->
-<section class="screen" id="screen-dashboard">
-  <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
-    <label style="cursor:pointer;">
-      <img id="dashboardStorePhoto" src="" alt="" style="width:52px; height:52px; border-radius:12px; object-fit:cover; background:var(--stone);">
-      <input type="file" accept="image/*" style="display:none;" onchange="changeStorePhoto(this)">
-    </label>
-    <div>
-      <div class="step-title" style="margin:0;">Musa's Kitchen</div>
-      <div class="step-sub" style="margin:0;">Your vendor dashboard</div>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <div class="tab active" data-tab="orders" onclick="switchTab('orders')">Orders</div>
-    <div class="tab" data-tab="menu" onclick="switchTab('menu')">Menu</div>
-    <div class="tab" data-tab="earnings" onclick="switchTab('earnings')">Earnings</div>
-  </div>
-
-  <!-- ORDERS TAB -->
-  <div id="tab-orders">
-    <div class="order-card">
-      <div class="top">
-        <div><div class="oid">SK · 7429</div><h4>2 items · ₦5,500</h4></div>
-        <span class="status-pill new">New order</span>
-      </div>
-      <div class="order-items">1× Jollof Rice & Chicken, 1× Fura da Nono · Pickup, ASAP</div>
-      <div class="order-actions">
-        <button onclick="advanceOrder(this,'preparing')">Reject</button>
-        <button class="primary" onclick="advanceOrder(this,'preparing')">Accept order</button>
-      </div>
-    </div>
-    <div class="order-card">
-      <div class="top">
-        <div><div class="oid">SK · 6210</div><h4>1 item · ₦3,500</h4></div>
-        <span class="status-pill preparing">Preparing</span>
-      </div>
-      <div class="order-items">1× Beef Suya (Full) · Delivery, rider assigned</div>
-      <div class="order-actions">
-        <button class="primary" onclick="advanceOrder(this,'ready')">Mark as ready</button>
-      </div>
-    </div>
-    <div class="order-card">
-      <div class="top">
-        <div><div class="oid">SK · 5992</div><h4>3 items · ₦8,200</h4></div>
-        <span class="status-pill ready">Ready</span>
-      </div>
-      <div class="order-items">Waiting for pickup at your set time</div>
-    </div>
-  </div>
-
-  <!-- MENU TAB -->
-  <div id="tab-menu" style="display:none;">
-    <div class="note">Toggle items off when you run out — customers won't be able to order them.</div>
-    <div id="menuManageList"></div>
-    <div id="newItemForm" style="display:none; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px;">
-      <div class="field"><label>Item name</label><input type="text" id="newItemName"></div>
-      <div class="field"><label>Price (₦)</label><input type="text" id="newItemPrice"></div>
-      <div class="field">
-        <label>Photo</label>
-        <label class="photo-upload" style="cursor:pointer; width:100%; height:90px; border-radius:12px;">
-          <span id="newItemPhotoLabel">📷 Tap to choose a photo</span>
-          <input type="file" accept="image/*" style="display:none;" id="newItemPhotoInput" onchange="previewNewItemPhoto(this)">
-        </label>
-      </div>
-      <button class="btn btn-primary" onclick="saveNewMenuItem()">Save item</button>
-    </div>
-    <button class="add-item-btn" onclick="document.getElementById('newItemForm').style.display='block'; this.style.display='none';">＋ Add menu item</button>
-  </div>
-
-  <!-- EARNINGS TAB -->
-  <div id="tab-earnings" style="display:none;">
-    <div class="earn-card">
-      <div class="label">Available to cash out</div>
-      <div class="amt">₦46,800</div>
-      <div class="earn-sub">
-        <div class="earn-sub-chip"><div class="n">₦12,400</div><div class="l">In dispute window</div></div>
-        <div class="earn-sub-chip"><div class="n">₦210,600</div><div class="l">All-time earned</div></div>
-      </div>
-    </div>
-    <div class="note">Orders enter a 1-day dispute window before their earnings become available. No dispute = ready to cash out the next day.</div>
-    <button class="btn btn-primary" onclick="requestCashout()">Request cash-out</button>
-
-    <div style="margin-top:22px; font-size:13px; font-weight:700; color:var(--plum);">Recent payouts</div>
-    <div style="margin-top:10px;">
-      <div class="payout-row"><span>Jul 21 · Cash-out</span><span class="amt">₦38,200</span><span class="payout-status paid">Paid</span></div>
-      <div class="payout-row"><span>Jul 14 · Cash-out</span><span class="amt">₦29,900</span><span class="payout-status paid">Paid</span></div>
-      <div class="payout-row"><span>Jul 24 · Requested</span><span class="amt">₦46,800</span><span class="payout-status pending" id="pendingPayoutStatus">Pending review</span></div>
-    </div>
-  </div>
+  <div class="section-label">Active riders</div>
+  <div id="riderList"></div>
 </section>
 
 </div>
 
+<div class="bottom-nav">
+  <button class="active" data-p="overview" onclick="go('overview')"><span class="ic">📊</span>Overview</button>
+  <button class="badge-dot" data-n="3" data-p="vendors" onclick="go('vendors')"><span class="ic">🏪</span>Vendors</button>
+  <button data-p="orders" onclick="go('orders')"><span class="ic">🧾</span>Orders</button>
+  <button class="badge-dot" data-n="2" data-p="payouts" onclick="go('payouts')"><span class="ic">💳</span>Payouts</button>
+  <button data-p="riders" onclick="go('riders')"><span class="ic">🛵</span>Riders</button>
+</div>
+
 <script src="supabase-config.js"></script>
 <script>
-let draftItems = [];
-let bizPhotoFile = null;
-
-// Phone photo filenames can contain emoji, spaces, or other characters
-// that Supabase Storage rejects — this strips them down to something safe.
-function safeFileName(originalName){
-  const extMatch = originalName.match(/\.[a-zA-Z0-9]+$/);
-  const ext = extMatch ? extMatch[0].toLowerCase() : '.jpg';
-  return `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
-}
-function previewBizPhoto(inputEl){
-  bizPhotoFile = inputEl.files[0];
-  if(bizPhotoFile){
-    document.getElementById('bizPhotoLabel').innerHTML = `<img src="${URL.createObjectURL(bizPhotoFile)}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
-  }
-}
-let draftIdCounter = 1;
-
-// ---- Auth ----
-let currentVendor = null;
-
-function addDraftItem(){
-  const id = 'd'+draftIdCounter++;
-  draftItems.push({id, name:'', price:'', inStock:true, photo_url:null});
-  renderDraftItems();
-}
-function removeDraftItem(id){
-  draftItems = draftItems.filter(i=>i.id!==id);
-  renderDraftItems();
-}
-function updateDraftField(id, field, value){
-  const item = draftItems.find(i=>i.id===id);
-  if(item) item[field] = value;
-}
-function toggleDraftStock(id){
-  const item = draftItems.find(i=>i.id===id);
-  if(item) item.inStock = !item.inStock;
-  renderDraftItems();
-}
-async function uploadDraftPhoto(id, inputEl){
-  const file = inputEl.files[0];
-  if(!file) return;
-  const item = draftItems.find(i=>i.id===id);
-  const path = `drafts/${safeFileName(file.name)}`;
-  const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
-  if(error){ alert('Photo upload failed: ' + error.message); return; }
-  const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
-  item.photo_url = data.publicUrl;
-  renderDraftItems();
-}
-function renderDraftItems(){
-  const el = document.getElementById('menuDraftList');
-  el.innerHTML = draftItems.map(item => `
-    <div class="menu-draft-item">
-      <label class="photo-upload" style="cursor:pointer; overflow:hidden; padding:0;">
-        ${item.photo_url ? `<img src="${item.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">` : '📷'}
-        <input type="file" accept="image/*" style="display:none;" onchange="uploadDraftPhoto('${item.id}', this)">
-      </label>
-      <div class="menu-draft-body">
-        <input type="text" placeholder="Item name" value="${item.name}" oninput="updateDraftField('${item.id}','name',this.value)" style="border:none; font-size:13.5px; font-weight:700; width:100%; padding:2px 0; background:transparent;">
-        <input type="text" placeholder="Price (₦)" value="${item.price}" oninput="updateDraftField('${item.id}','price',this.value)" style="border:none; font-size:12px; color:var(--ink-soft); width:100%; padding:2px 0; background:transparent;">
-      </div>
-      <button class="stock-toggle" onclick="toggleDraftStock('${item.id}')" style="background:none; border:none;">${item.inStock ? '● In stock' : '○ Out of stock'}</button>
-      <button class="remove-item" onclick="removeDraftItem('${item.id}')">✕</button>
-    </div>
-  `).join('');
+function go(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active', b.dataset.p===page));
+  window.scrollTo(0,0);
 }
 
-async function vendorLogin(){
-  const email = document.getElementById('vAuthEmail').value.trim();
-  const password = document.getElementById('vAuthPassword').value;
-  const err = document.getElementById('vAuthError');
+async function adminLogin(){
+  const email = document.getElementById('aAuthEmail').value.trim();
+  const password = document.getElementById('aAuthPassword').value;
+  const err = document.getElementById('aAuthError');
   err.textContent = '';
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ err.textContent = error.message; return; }
-  await afterLogin();
-}
-async function vendorSignup(){
-  const email = document.getElementById('vAuthEmail').value.trim();
-  const password = document.getElementById('vAuthPassword').value;
-  const err = document.getElementById('vAuthError');
-  err.textContent = '';
-  const { error } = await supabaseClient.auth.signUp({ email, password });
-  if(error){ err.textContent = error.message; return; }
-  err.style.color = 'var(--green)';
-  err.textContent = 'Account created — check your email to confirm, then log in.';
-}
 
-async function afterLogin(){
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if(!session) return;
-
-  const { data: vendors } = await supabaseClient
-    .from('vendors').select('*').eq('owner_id', session.user.id).limit(1);
-
-  if(vendors && vendors.length > 0){
-    currentVendor = vendors[0];
-    if(currentVendor.status === 'approved'){
-      goDashboard();
-    }else{
-      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-      document.getElementById('screen-pending').classList.add('active');
-    }
-  } else {
-    goStep(1); // no store yet — start registration
+  const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+  if(!profile || profile.role !== 'admin'){
+    err.textContent = "This account isn't an admin. Access denied.";
+    await supabaseClient.auth.signOut();
+    return;
   }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-overview').classList.add('active');
+  loadEverything();
 }
 
-// ---- Registration submit (real) ----
-async function submitRegistration(){
-  if(document.getElementById('submitBtn').classList.contains('disabled')) return;
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if(!session){ alert('Please log in first.'); return; }
-
-  let cover_image_url = null;
-  if(bizPhotoFile){
-    const path = `stores/${session.user.id}-${safeFileName(bizPhotoFile.name)}`;
-    const { error: uploadErr } = await supabaseClient.storage.from('menu-photos').upload(path, bizPhotoFile);
-    if(uploadErr){ alert('Store photo upload failed: ' + uploadErr.message); return; }
-    const { data: urlData } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
-    cover_image_url = urlData.publicUrl;
-  }
-
-  const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'restaurant';
-  const { data: vendorRows, error: vErr } = await supabaseClient.from('vendors').insert([{
-    owner_id: session.user.id,
-    name: document.getElementById('bizName').value.trim(),
-    category,
-    phone: document.getElementById('bizPhone').value.trim(),
-    whatsapp: document.getElementById('bizWhatsapp').value.trim(),
-    address: document.getElementById('bizAddress').value.trim(),
-    bank_name: document.getElementById('bankName').value.trim(),
-    account_number: document.getElementById('acctNumber').value.trim(),
-    account_name: document.getElementById('acctName').value.trim(),
-    cover_image_url,
-    status: 'pending'
-  }]).select();
-
-  if(vErr){ alert('Could not submit: ' + vErr.message); return; }
-  const vendor = vendorRows[0];
-  currentVendor = vendor;
-
-  const validItems = draftItems.filter(i => i.name && i.price);
-  if(validItems.length > 0){
-    await supabaseClient.from('menu_items').insert(
-      validItems.map(i => ({
-        vendor_id: vendor.id, name: i.name, price: Number(i.price), in_stock: i.inStock, photo_url: i.photo_url || null
-      }))
-    );
-  }
-
-  notifyAdmin('New vendor application', `${vendor.name} (${vendor.category}) just applied to join Sultini Express. Review it in the admin dashboard.`);
-
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-pending').classList.add('active');
-  document.getElementById('backBtn').style.visibility = 'hidden';
-  window.scrollTo(0,0);
+async function loadEverything(){
+  await loadVendors();
+  await loadOrders();
+  await loadPayouts();
+  await loadRiders();
+  await loadOverview();
 }
 
-async function notifyAdmin(subject, message){
-  try {
-    await fetch('/api/notify-admin', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ subject, message })
-    });
-  } catch(e){ console.error('Notification failed', e); }
-}
+// ---- Overview ----
+async function loadOverview(){
+  const [{ data: allOrders }, { data: pendingVendors }, { data: activeRiders }, { data: pendingLedger }] = await Promise.all([
+    supabaseClient.from('orders').select('total, created_at'),
+    supabaseClient.from('vendors').select('id').eq('status', 'pending'),
+    supabaseClient.from('riders').select('id').eq('active', true),
+    supabaseClient.from('ledger_entries').select('id, amount').eq('status', 'available')
+  ]);
 
-function goStep(n){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-step'+n).classList.add('active');
-  document.getElementById('backBtn').style.visibility = n>1 ? 'visible':'hidden';
-  window.scrollTo(0,0);
-  if(n===2 && draftItems.length===0) addDraftItem();
-}
+  const orders = allOrders || [];
+  const todayStr = new Date().toDateString();
+  const ordersToday = orders.filter(o => new Date(o.created_at).toDateString() === todayStr).length;
 
-document.querySelectorAll('.cat-select').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.cat-select').forEach(b=>b.classList.remove('selected'));
-    btn.classList.add('selected');
+  const weekAgo = Date.now() - 7*24*60*60*1000;
+  const weekOrders = orders.filter(o => new Date(o.created_at).getTime() >= weekAgo);
+  const grossThisWeek = weekOrders.reduce((s,o)=>s+Number(o.total),0);
+  const platformShareEstimate = Math.round(grossThisWeek * 0.2);
+
+  const pendingCashoutTotal = (pendingLedger || []).reduce((s,e)=>s+Number(e.amount),0);
+
+  document.getElementById('metricGrid').innerHTML = `
+    <div class="metric-card wide">
+      <div><div class="n">₦${grossThisWeek.toLocaleString()}</div><div class="l">Gross order value, this week</div></div>
+      <div style="text-align:right;"><div class="n">₦${platformShareEstimate.toLocaleString()}</div><div class="l">Platform earnings (20%, est.)</div></div>
+    </div>
+    <div class="metric-card"><div class="n">${ordersToday}</div><div class="l">Orders today</div></div>
+    <div class="metric-card"><div class="n">${(pendingVendors||[]).length}</div><div class="l">Vendors pending review</div></div>
+    <div class="metric-card"><div class="n">${(activeRiders||[]).length}</div><div class="l">Active riders</div></div>
+    <div class="metric-card"><div class="n">₦${pendingCashoutTotal.toLocaleString()}</div><div class="l">Cash-outs pending approval</div></div>
+  `;
+
+  // Attention feed: pending vendors + available cash-outs, most recent first
+  const { data: vendorsPending } = await supabaseClient.from('vendors').select('id, name, category').eq('status','pending').limit(3);
+  const { data: ledgerPending } = await supabaseClient.from('ledger_entries').select('id, amount, vendors(name), riders(full_name), recipient_type').eq('status','available').limit(3);
+
+  let cards = '';
+  (vendorsPending||[]).forEach(v => {
+    cards += `<div class="card"><div class="top"><div><h4>${v.name}</h4><div class="meta">New vendor application · ${v.category}</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('vendors')">Review</button></div></div>`;
   });
-});
-
-function toggleSubmit(){
-  document.getElementById('submitBtn').classList.toggle('disabled', !document.getElementById('agreeCheck').checked);
+  (ledgerPending||[]).forEach(e => {
+    const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    cards += `<div class="card"><div class="top"><div><h4>Cash-out · ${who}</h4><div class="meta">₦${Number(e.amount).toLocaleString()} requested · dispute window clear</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('payouts')">Review</button></div></div>`;
+  });
+  document.getElementById('attentionContainer').innerHTML = cards || '<div class="empty">Nothing needs attention right now.</div>';
 }
 
-// ---- Dashboard (real data) ----
-async function goDashboard(){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-dashboard').classList.add('active');
-  document.getElementById('backBtn').style.visibility = 'visible';
-  document.querySelector('#screen-dashboard .step-title').textContent = currentVendor.name;
-  document.getElementById('dashboardStorePhoto').src = currentVendor.cover_image_url || '';
-  await loadOrders();
-  await loadMenu();
-  await loadEarnings();
-  window.scrollTo(0,0);
+// ---- Vendors ----
+async function loadVendors(){
+  const { data: vendors } = await supabaseClient.from('vendors').select('*').order('created_at', {ascending:false});
+  const el = document.getElementById('vendorsContainer');
+  if(!vendors || vendors.length===0){ el.innerHTML = '<div class="empty">No vendors yet.</div>'; return; }
+  const pending = vendors.filter(v=>v.status==='pending');
+  const live = vendors.filter(v=>v.status==='approved');
+  const photoImg = v => `<img src="${v.cover_image_url||''}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;background:var(--line);flex:0 0 auto;">`;
+  el.innerHTML =
+    `<div class="section-label">Pending approval (${pending.length})</div>` +
+    pending.map(v => `
+      <div class="card">
+        <div class="top">${photoImg(v)}<div style="flex:1;"><h4>${v.name}</h4><div class="meta">${v.category} · ${v.address||''}</div></div><span class="pill pending">Pending</span></div>
+        <div class="row-actions">
+          <button class="danger" onclick="setVendorStatus('${v.id}','rejected')">Reject</button>
+          <button class="primary" onclick="setVendorStatus('${v.id}','approved')">Approve</button>
+        </div>
+      </div>`).join('') +
+    `<div class="section-label">Live on the platform</div>` +
+    (live.length ? live.map(v => `
+      <div class="card"><div class="top">${photoImg(v)}<div style="flex:1;"><h4>${v.name}</h4><div class="meta">${v.category} · ${v.rating||0}★</div></div><span class="pill approved">Live</span></div></div>
+    `).join('') : '<div class="empty">None live yet.</div>');
+}
+async function setVendorStatus(id, status){
+  await supabaseClient.from('vendors').update({ status }).eq('id', id);
+  await loadVendors();
 }
 
-async function changeStorePhoto(inputEl){
-  const file = inputEl.files[0];
-  if(!file) return;
-  const path = `stores/${currentVendor.id}-${safeFileName(file.name)}`;
-  const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
-  if(error){ alert('Photo upload failed: ' + error.message); return; }
-  const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
-  await supabaseClient.from('vendors').update({ cover_image_url: data.publicUrl }).eq('id', currentVendor.id);
-  currentVendor.cover_image_url = data.publicUrl;
-  document.getElementById('dashboardStorePhoto').src = data.publicUrl;
-}
-
-document.getElementById('backBtn').addEventListener('click', ()=>{
-  const active = document.querySelector('.screen.active').id;
-  if(active==='screen-step2') goStep(1);
-  else if(active==='screen-step3') goStep(2);
-  else if(active==='screen-dashboard'){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById('screen-auth').classList.add('active'); document.getElementById('backBtn').style.visibility='hidden'; }
-});
-
-function switchTab(tab){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
-  document.getElementById('tab-orders').style.display = tab==='orders' ? 'block':'none';
-  document.getElementById('tab-menu').style.display = tab==='menu' ? 'block':'none';
-  document.getElementById('tab-earnings').style.display = tab==='earnings' ? 'block':'none';
-}
-
+// ---- Orders ----
 async function loadOrders(){
-  const { data: orders } = await supabaseClient
-    .from('orders').select('*').eq('vendor_id', currentVendor.id).order('created_at', {ascending:false}).limit(20);
-  const el = document.getElementById('tab-orders');
-  if(!orders || orders.length === 0){ el.innerHTML = '<div class="note">No orders yet.</div>'; return; }
-  el.innerHTML = orders.map(o => `
-    <div class="order-card">
+  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name), riders(full_name)').order('created_at',{ascending:false}).limit(30);
+  const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name').eq('active', true);
+  const el = document.getElementById('ordersContainer');
+  if(!orders || orders.length===0){ el.innerHTML = '<div class="empty">No orders yet.</div>'; return; }
+
+  const riderOptions = (activeRiders||[]).map(r => `<option value="${r.id}">${r.full_name}</option>`).join('');
+
+  el.innerHTML = orders.map(o => {
+    let riderSection = '';
+    if(o.fulfilment === 'delivery'){
+      if(o.rider_id){
+        riderSection = `<div class="meta" style="margin-top:6px;">🛵 Rider: ${o.riders?.full_name || 'Assigned'}</div>`;
+        if(!['delivered','completed'].includes(o.status)){
+          riderSection += `<div class="row-actions"><button class="primary" onclick="markDelivered('${o.id}','${o.vendor_id}','${o.delivery_fee}')">Mark delivered</button></div>`;
+        }
+      } else {
+        riderSection = `
+          <div class="row-actions">
+            <select id="riderSelect-${o.id}" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line);">
+              <option value="">Assign a rider…</option>
+              ${riderOptions}
+            </select>
+            <button class="primary" onclick="assignRider('${o.id}')">Assign</button>
+          </div>`;
+      }
+    }
+    return `
+    <div class="card">
       <div class="top">
-        <div><div class="oid">${o.pickup_code}</div><h4>₦${Number(o.total).toLocaleString()}</h4></div>
-        <span class="status-pill ${o.status==='ready'?'ready':(o.status==='preparing'?'preparing':'new')}">${o.status}</span>
+        <div><div class="id">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4><div class="meta">${o.fulfilment} · ${o.status}</div></div>
+        <span class="pill ${o.status==='delivered'||o.status==='picked_up'||o.status==='completed'?'approved':'done'}">${o.status}</span>
       </div>
-      <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
-      ${o.status==='new' ? `<div class="order-actions"><button onclick="updateOrderStatus('${o.id}','rejected')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
-      ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready')">Mark as ready</button></div>` : ''}
-    </div>
-  `).join('');
+      ${riderSection}
+    </div>`;
+  }).join('');
 }
-async function updateOrderStatus(orderId, status){
-  await supabaseClient.from('orders').update({ status }).eq('id', orderId);
+
+async function assignRider(orderId){
+  const select = document.getElementById('riderSelect-'+orderId);
+  const riderId = select.value;
+  if(!riderId){ alert('Choose a rider first.'); return; }
+  await supabaseClient.from('orders').update({ rider_id: riderId, status: 'out_for_delivery' }).eq('id', orderId);
   await loadOrders();
 }
 
-async function loadMenu(){
-  const { data: items } = await supabaseClient
-    .from('menu_items').select('*').eq('vendor_id', currentVendor.id);
-  window.menuItems = items || [];
-  renderManageItems();
-}
-function renderManageItems(){
-  const el = document.getElementById('menuManageList');
-  if(!window.menuItems || window.menuItems.length === 0){ el.innerHTML = '<div class="note">No menu items yet.</div>'; return; }
-  el.innerHTML = window.menuItems.map(item => `
-    <div class="menu-manage-item">
-      <label style="cursor:pointer; flex:0 0 auto;">
-        <img src="${item.photo_url || ''}" alt="${item.name}" style="background:var(--stone); width:52px; height:52px; border-radius:10px; object-fit:cover;">
-        <input type="file" accept="image/*" style="display:none;" onchange="changeItemPhoto('${item.id}', this)">
-      </label>
-      <div class="menu-manage-body"><div class="n">${item.name}</div><div class="p">₦${Number(item.price).toLocaleString()}</div></div>
-      <button class="switch ${item.in_stock?'on':''}" onclick="toggleManageStock('${item.id}')"></button>
-    </div>
-  `).join('');
-}
-async function toggleManageStock(id){
-  const item = window.menuItems.find(i=>i.id===id);
-  await supabaseClient.from('menu_items').update({ in_stock: !item.in_stock }).eq('id', id);
-  await loadMenu();
-}
-let newItemPhotoFile = null;
-function previewNewItemPhoto(inputEl){
-  newItemPhotoFile = inputEl.files[0];
-  if(newItemPhotoFile){
-    document.getElementById('newItemPhotoLabel').textContent = '✓ ' + newItemPhotoFile.name;
+async function markDelivered(orderId, vendorId, deliveryFee){
+  const { data: order } = await supabaseClient.from('orders').select('rider_id').eq('id', orderId).single();
+  await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+
+  // Pay the rider their 80% share of the delivery fee, held for the 1-day dispute window
+  const fee = Number(deliveryFee) || 0;
+  if(order?.rider_id && fee > 0){
+    const riderShare = +(fee * 0.8).toFixed(2);
+    const availableAt = new Date(Date.now() + 24*60*60*1000).toISOString();
+    await supabaseClient.from('ledger_entries').insert([{
+      order_id: orderId, recipient_type: 'rider', rider_id: order.rider_id,
+      amount: riderShare, status: 'in_dispute_window', available_at: availableAt
+    }]);
   }
-}
-async function saveNewMenuItem(){
-  const name = document.getElementById('newItemName').value.trim();
-  const price = document.getElementById('newItemPrice').value.trim();
-  if(!name || !price){ alert('Enter a name and price.'); return; }
-
-  let photo_url = null;
-  if(newItemPhotoFile){
-    const path = `${currentVendor.id}/${safeFileName(newItemPhotoFile.name)}`;
-    const { error } = await supabaseClient.storage.from('menu-photos').upload(path, newItemPhotoFile);
-    if(error){ alert('Photo upload failed: ' + error.message); return; }
-    const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
-    photo_url = data.publicUrl;
-  }
-
-  await supabaseClient.from('menu_items').insert([{ vendor_id: currentVendor.id, name, price: Number(price), in_stock: true, photo_url }]);
-
-  document.getElementById('newItemName').value = '';
-  document.getElementById('newItemPrice').value = '';
-  document.getElementById('newItemPhotoLabel').textContent = '📷 Tap to choose a photo';
-  newItemPhotoFile = null;
-  document.getElementById('newItemForm').style.display = 'none';
-  document.querySelector('.add-item-btn').style.display = 'block';
-  await loadMenu();
+  await loadOrders();
+  await loadOverview();
 }
 
-async function changeItemPhoto(itemId, inputEl){
-  const file = inputEl.files[0];
-  if(!file) return;
-  const path = `${currentVendor.id}/${safeFileName(file.name)}`;
-  const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
-  if(error){ alert('Photo upload failed: ' + error.message); return; }
-  const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
-  await supabaseClient.from('menu_items').update({ photo_url: data.publicUrl }).eq('id', itemId);
-  await loadMenu();
-}
-
-async function loadEarnings(){
+// ---- Payouts ----
+async function loadPayouts(){
   const { data: entries } = await supabaseClient
-    .from('ledger_entries').select('*').eq('vendor_id', currentVendor.id);
-  const list = entries || [];
-  const available = list.filter(e=>e.status==='available').reduce((s,e)=>s+Number(e.amount),0);
-  const inWindow = list.filter(e=>e.status==='in_dispute_window').reduce((s,e)=>s+Number(e.amount),0);
-  const allTime = list.reduce((s,e)=>s+Number(e.amount),0);
-  document.querySelector('.earn-card .amt').textContent = '₦'+available.toLocaleString();
-  const chips = document.querySelectorAll('.earn-sub-chip .n');
-  if(chips[0]) chips[0].textContent = '₦'+inWindow.toLocaleString();
-  if(chips[1]) chips[1].textContent = '₦'+allTime.toLocaleString();
+    .from('ledger_entries').select('*, vendors(name), riders(full_name)')
+    .in('status', ['available','cashout_requested','in_dispute_window'])
+    .order('created_at', {ascending:false}).limit(30);
+  const el = document.getElementById('payoutsContainer');
+  if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No pending cash-outs.</div>'; return; }
+  el.innerHTML = entries.map(e => {
+    const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    if(e.status==='in_dispute_window'){
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Still in dispute window</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
+    }
+    return `<div class="card">
+      <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Dispute window clear</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="row-actions">
+        <button class="danger" onclick="setLedgerStatus('${e.id}','held')">Hold</button>
+        <button class="primary" onclick="setLedgerStatus('${e.id}','paid')">Approve payout</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function setLedgerStatus(id, status){
+  await supabaseClient.from('ledger_entries').update({ status, paid_at: status==='paid' ? new Date().toISOString() : null }).eq('id', id);
+  await loadPayouts();
 }
 
-async function requestCashout(){
-  await supabaseClient.from('ledger_entries')
-    .update({ status: 'cashout_requested' })
-    .eq('vendor_id', currentVendor.id).eq('status', 'available');
-  notifyAdmin('Cash-out requested', `${currentVendor.name} has requested a cash-out. Review it in the admin dashboard's Payouts tab.`);
-  alert("Cash-out requested. Sultini will review and approve payment to your account on file, assuming no disputes are raised.");
-  await loadEarnings();
+// ---- Riders ----
+async function loadRiders(){
+  const { data: riders } = await supabaseClient.from('riders').select('*').order('created_at',{ascending:false});
+  const el = document.getElementById('riderList');
+  if(!riders || riders.length===0){ el.innerHTML = '<div class="empty">No riders added yet.</div>'; return; }
+  el.innerHTML = riders.map(r=>`
+    <div class="rider-row">
+      <div><div class="n">${r.full_name}</div><div class="m">${r.vehicle||'—'} · ${r.phone}</div></div>
+      <span class="pill ${r.active?'approved':'flag'}">${r.active?'Active':'Inactive'}</span>
+    </div>`).join('');
+}
+async function addRider(){
+  const full_name = document.getElementById('riderName').value.trim();
+  const phone = document.getElementById('riderPhone').value.trim();
+  const vehicle = document.getElementById('riderVehicle').value.trim();
+  const bank_name = document.getElementById('riderBank').value.trim();
+  const account_number = document.getElementById('riderAcct').value.trim();
+  if(!full_name || !phone) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  await supabaseClient.from('riders').insert([{ full_name, phone, vehicle, bank_name, account_number, added_by: session.user.id }]);
+  document.getElementById('riderName').value='';
+  document.getElementById('riderPhone').value='';
+  document.getElementById('riderVehicle').value='';
+  document.getElementById('riderBank').value='';
+  document.getElementById('riderAcct').value='';
+  await loadRiders();
 }
 
-document.getElementById('backToBrowseBtn')?.addEventListener('click', ()=>{});
-
-supabaseClient.auth.getSession().then(({data:{session}}) => { if(session) afterLogin(); });
+supabaseClient.auth.getSession().then(({data:{session}}) => {
+  if(session) adminLogin(); // will re-check role; harmless if already logged in
+});
 </script>
+
 </body>
 </html>
