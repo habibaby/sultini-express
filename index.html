@@ -129,6 +129,7 @@
     <button class="back-btn" id="backBtn" style="visibility:hidden;">←</button>
     <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
     <button class="cart-btn" id="cartBtn">🛍<span class="cart-count" id="cartCount" style="display:none;">0</span></button>
+    <button class="back-btn" id="accountBtn" style="margin-left:8px;">👤</button>
   </div>
 </header>
 
@@ -224,6 +225,26 @@
   </div>
 </section>
 
+<section class="screen" id="screen-account">
+  <div class="section-title" id="accountTitle">Log in</div>
+  <div id="accountLoggedOut">
+    <input id="authEmail" type="email" placeholder="Email" class="search-bar" style="width:100%; text-align:left; margin-bottom:10px;">
+    <input id="authPassword" type="password" placeholder="Password" class="search-bar" style="width:100%; text-align:left; margin-bottom:10px;">
+    <input id="authFullName" type="text" placeholder="Full name (signup only)" class="search-bar" style="width:100%; text-align:left; margin-bottom:10px;">
+    <button class="btn btn-primary" id="loginBtn" style="margin-bottom:10px;">Log in</button>
+    <button class="btn" id="signupBtn" style="background:#fff; color:var(--plum); border:1.5px solid var(--line);">Sign up instead</button>
+    <div id="authError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
+  </div>
+  <div id="accountLoggedIn" style="display:none;">
+    <div class="empty-state">
+      <div class="icon">👤</div>
+      <div id="accountEmailDisplay" style="font-weight:700; color:var(--ink);"></div>
+      <div style="font-size:12.5px; margin-top:6px;" id="accountOrderCount"></div>
+      <button class="btn" id="logoutBtn" style="margin-top:20px; background:#fff; color:var(--plum); border:1.5px solid var(--line);">Log out</button>
+    </div>
+  </div>
+</section>
+
 </div>
 
 <div class="cart-bar" id="cartBar">
@@ -240,7 +261,74 @@ let currentStore = null;
 let fulfilment = null;
 let pickupTime = null;
 const DELIVERY_FEE = 1500;
-const CUSTOMER = { loggedIn: false, completedOrders: 0 }; // real auth wiring comes next
+const CUSTOMER = { loggedIn: false, completedOrders: 0, email: null };
+
+async function refreshAuthState(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(session){
+    CUSTOMER.loggedIn = true;
+    CUSTOMER.email = session.user.email;
+    const { count } = await supabaseClient
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', session.user.id)
+      .in('status', ['completed','delivered','picked_up']);
+    CUSTOMER.completedOrders = count || 0;
+  } else {
+    CUSTOMER.loggedIn = false;
+    CUSTOMER.email = null;
+    CUSTOMER.completedOrders = 0;
+  }
+  renderAccountScreen();
+}
+
+function renderAccountScreen(){
+  document.getElementById('accountLoggedOut').style.display = CUSTOMER.loggedIn ? 'none' : 'block';
+  document.getElementById('accountLoggedIn').style.display = CUSTOMER.loggedIn ? 'block' : 'none';
+  document.getElementById('accountTitle').textContent = CUSTOMER.loggedIn ? 'Your account' : 'Log in';
+  if(CUSTOMER.loggedIn){
+    document.getElementById('accountEmailDisplay').textContent = CUSTOMER.email;
+    document.getElementById('accountOrderCount').textContent =
+      CUSTOMER.completedOrders >= 5
+        ? `${CUSTOMER.completedOrders} orders completed — cash on delivery unlocked`
+        : `${CUSTOMER.completedOrders}/5 orders completed toward cash on delivery`;
+  }
+}
+
+document.getElementById('accountBtn').addEventListener('click', ()=>{
+  renderAccountScreen();
+  showScreen('screen-account', true);
+});
+
+document.getElementById('loginBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = error.message; return; }
+  await refreshAuthState();
+});
+
+document.getElementById('signupBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const fullName = document.getElementById('authFullName').value.trim();
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  if(!email || !password){ errEl.textContent = 'Enter an email and password first.'; return; }
+  const { error } = await supabaseClient.auth.signUp({
+    email, password, options: { data: { full_name: fullName } }
+  });
+  if(error){ errEl.textContent = error.message; return; }
+  errEl.style.color = 'var(--green)';
+  errEl.textContent = 'Account created — check your email to confirm, then log in.';
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  await supabaseClient.auth.signOut();
+  await refreshAuthState();
+});
 
 async function loadStores(){
   const { data: vendors, error } = await supabaseClient
@@ -454,7 +542,7 @@ document.getElementById('payCOD').addEventListener('click', ()=>{
 
 const PAYSTACK_PUBLIC_KEY = "pk_live_132176639a435d2929cb1cbe4ec63f9c924f48c8";
 
-document.getElementById('placeOrderBtn').addEventListener('click', ()=>{
+document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   if(document.getElementById('placeOrderBtn').classList.contains('disabled')) return;
 
   const guestName = document.getElementById('guestName').value.trim();
@@ -473,9 +561,11 @@ document.getElementById('placeOrderBtn').addEventListener('click', ()=>{
   const deliveryFee = fulfilment==='delivery' ? DELIVERY_FEE : 0;
   const total = subtotal + deliveryFee;
   const vendorId = Object.values(cart)[0].store.id; // NOTE: assumes single-vendor cart for now
+  const { data: { session } } = await supabaseClient.auth.getSession();
 
   const orderPayload = {
     vendorId,
+    customerId: session ? session.user.id : null,
     items: Object.values(cart).map(c => ({ menuItemId: c.item.id, qty: c.qty, price: c.item.price })),
     fulfilment,
     deliveryFee,
@@ -539,6 +629,8 @@ function showConfirmation(pickupCode){
 document.getElementById('backToBrowseBtn').addEventListener('click', ()=>{ showScreen('screen-browse', false); });
 
 loadStores();
+refreshAuthState();
+supabaseClient.auth.onAuthStateChange(() => refreshAuthState());
 </script>
 </body>
 </html>
