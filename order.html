@@ -127,7 +127,7 @@
 <header>
   <div class="nav-row">
     <button class="back-btn" id="backBtn" style="visibility:hidden;">←</button>
-    <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
+    <a href="index.html" class="brand"><span class="dot"></span>Sultini Express</a>
     <button class="cart-btn" id="cartBtn">🛍<span class="cart-count" id="cartCount" style="display:none;">0</span></button>
     <button class="back-btn" id="accountBtn" style="margin-left:8px;">👤</button>
   </div>
@@ -308,6 +308,7 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ errEl.textContent = error.message; return; }
   await refreshAuthState();
+  showScreen('screen-browse', false); // back to shopping, not stuck on the account screen
 });
 
 document.getElementById('signupBtn').addEventListener('click', async ()=>{
@@ -631,6 +632,14 @@ document.getElementById('backToBrowseBtn').addEventListener('click', ()=>{ showS
 loadStores();
 refreshAuthState();
 supabaseClient.auth.onAuthStateChange(() => refreshAuthState());
+
+// If we arrived here via a "Log in" / "Sign up" link from the homepage,
+// jump straight to the login screen instead of the store browse screen.
+const urlParams = new URLSearchParams(window.location.search);
+if(urlParams.get('screen') === 'account'){
+  renderAccountScreen();
+  showScreen('screen-account', true);
+}
 </script>
 </body>
 </html>
