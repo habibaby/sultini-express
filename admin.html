@@ -311,16 +311,67 @@ async function setVendorStatus(id, status){
 
 // ---- Orders ----
 async function loadOrders(){
-  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name)').order('created_at',{ascending:false}).limit(30);
+  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name), riders(full_name)').order('created_at',{ascending:false}).limit(30);
+  const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name').eq('active', true);
   const el = document.getElementById('ordersContainer');
   if(!orders || orders.length===0){ el.innerHTML = '<div class="empty">No orders yet.</div>'; return; }
-  el.innerHTML = orders.map(o => `
+
+  const riderOptions = (activeRiders||[]).map(r => `<option value="${r.id}">${r.full_name}</option>`).join('');
+
+  el.innerHTML = orders.map(o => {
+    let riderSection = '';
+    if(o.fulfilment === 'delivery'){
+      if(o.rider_id){
+        riderSection = `<div class="meta" style="margin-top:6px;">🛵 Rider: ${o.riders?.full_name || 'Assigned'}</div>`;
+        if(!['delivered','completed'].includes(o.status)){
+          riderSection += `<div class="row-actions"><button class="primary" onclick="markDelivered('${o.id}','${o.vendor_id}','${o.delivery_fee}')">Mark delivered</button></div>`;
+        }
+      } else {
+        riderSection = `
+          <div class="row-actions">
+            <select id="riderSelect-${o.id}" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line);">
+              <option value="">Assign a rider…</option>
+              ${riderOptions}
+            </select>
+            <button class="primary" onclick="assignRider('${o.id}')">Assign</button>
+          </div>`;
+      }
+    }
+    return `
     <div class="card">
       <div class="top">
         <div><div class="id">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4><div class="meta">${o.fulfilment} · ${o.status}</div></div>
         <span class="pill ${o.status==='delivered'||o.status==='picked_up'||o.status==='completed'?'approved':'done'}">${o.status}</span>
       </div>
-    </div>`).join('');
+      ${riderSection}
+    </div>`;
+  }).join('');
+}
+
+async function assignRider(orderId){
+  const select = document.getElementById('riderSelect-'+orderId);
+  const riderId = select.value;
+  if(!riderId){ alert('Choose a rider first.'); return; }
+  await supabaseClient.from('orders').update({ rider_id: riderId, status: 'out_for_delivery' }).eq('id', orderId);
+  await loadOrders();
+}
+
+async function markDelivered(orderId, vendorId, deliveryFee){
+  const { data: order } = await supabaseClient.from('orders').select('rider_id').eq('id', orderId).single();
+  await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+
+  // Pay the rider their 80% share of the delivery fee, held for the 1-day dispute window
+  const fee = Number(deliveryFee) || 0;
+  if(order?.rider_id && fee > 0){
+    const riderShare = +(fee * 0.8).toFixed(2);
+    const availableAt = new Date(Date.now() + 24*60*60*1000).toISOString();
+    await supabaseClient.from('ledger_entries').insert([{
+      order_id: orderId, recipient_type: 'rider', rider_id: order.rider_id,
+      amount: riderShare, status: 'in_dispute_window', available_at: availableAt
+    }]);
+  }
+  await loadOrders();
+  await loadOverview();
 }
 
 // ---- Payouts ----
