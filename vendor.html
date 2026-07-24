@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -366,6 +365,14 @@
 <script>
 let draftItems = [];
 let bizPhotoFile = null;
+
+// Phone photo filenames can contain emoji, spaces, or other characters
+// that Supabase Storage rejects — this strips them down to something safe.
+function safeFileName(originalName){
+  const extMatch = originalName.match(/\.[a-zA-Z0-9]+$/);
+  const ext = extMatch ? extMatch[0].toLowerCase() : '.jpg';
+  return `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+}
 function previewBizPhoto(inputEl){
   bizPhotoFile = inputEl.files[0];
   if(bizPhotoFile){
@@ -399,7 +406,7 @@ async function uploadDraftPhoto(id, inputEl){
   const file = inputEl.files[0];
   if(!file) return;
   const item = draftItems.find(i=>i.id===id);
-  const path = `drafts/${Date.now()}-${file.name}`;
+  const path = `drafts/${safeFileName(file.name)}`;
   const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
   if(error){ alert('Photo upload failed: ' + error.message); return; }
   const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
@@ -472,7 +479,7 @@ async function submitRegistration(){
 
   let cover_image_url = null;
   if(bizPhotoFile){
-    const path = `stores/${session.user.id}-${Date.now()}-${bizPhotoFile.name}`;
+    const path = `stores/${session.user.id}-${safeFileName(bizPhotoFile.name)}`;
     const { error: uploadErr } = await supabaseClient.storage.from('menu-photos').upload(path, bizPhotoFile);
     if(uploadErr){ alert('Store photo upload failed: ' + uploadErr.message); return; }
     const { data: urlData } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
@@ -560,7 +567,7 @@ async function goDashboard(){
 async function changeStorePhoto(inputEl){
   const file = inputEl.files[0];
   if(!file) return;
-  const path = `stores/${currentVendor.id}-${Date.now()}-${file.name}`;
+  const path = `stores/${currentVendor.id}-${safeFileName(file.name)}`;
   const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
   if(error){ alert('Photo upload failed: ' + error.message); return; }
   const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
@@ -644,7 +651,7 @@ async function saveNewMenuItem(){
 
   let photo_url = null;
   if(newItemPhotoFile){
-    const path = `${currentVendor.id}/${Date.now()}-${newItemPhotoFile.name}`;
+    const path = `${currentVendor.id}/${safeFileName(newItemPhotoFile.name)}`;
     const { error } = await supabaseClient.storage.from('menu-photos').upload(path, newItemPhotoFile);
     if(error){ alert('Photo upload failed: ' + error.message); return; }
     const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
@@ -665,7 +672,7 @@ async function saveNewMenuItem(){
 async function changeItemPhoto(itemId, inputEl){
   const file = inputEl.files[0];
   if(!file) return;
-  const path = `${currentVendor.id}/${Date.now()}-${file.name}`;
+  const path = `${currentVendor.id}/${safeFileName(file.name)}`;
   const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
   if(error){ alert('Photo upload failed: ' + error.message); return; }
   const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
