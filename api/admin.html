@@ -125,35 +125,12 @@
 <section class="page" id="page-overview">
   <div class="page-title">Overview</div>
   <div class="page-sub">Today at a glance</div>
-  <div class="metric-grid">
-    <div class="metric-card wide"><div><div class="n">₦1,284,600</div><div class="l">Gross order value, this week</div></div><div style="text-align:right;"><div class="n">₦256,920</div><div class="l">Platform earnings (20%)</div></div></div>
-    <div class="metric-card"><div class="n">47</div><div class="l">Orders today</div></div>
-    <div class="metric-card"><div class="n">3</div><div class="l">Vendors pending review</div></div>
-    <div class="metric-card"><div class="n">12</div><div class="l">Active riders</div></div>
-    <div class="metric-card"><div class="n">₦89,400</div><div class="l">Cash-outs pending approval</div></div>
+  <div class="metric-grid" id="metricGrid">
+    <div class="metric-card wide"><div class="l">Loading metrics…</div></div>
   </div>
 
   <div class="section-label">Needs your attention</div>
-  <div class="card">
-    <div class="top">
-      <div><h4>Kano Spice Grill</h4><div class="meta">New vendor application · Grills & suya</div></div>
-      <span class="pill pending">Pending</span>
-    </div>
-    <div class="row-actions">
-      <button class="danger">Reject</button>
-      <button class="primary" onclick="go('vendors')">Review</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="top">
-      <div><h4>Cash-out · Bara Suya Spot</h4><div class="meta">₦46,800 requested · dispute window clear</div></div>
-      <span class="pill pending">Pending</span>
-    </div>
-    <div class="row-actions">
-      <button class="danger">Hold</button>
-      <button class="primary" onclick="go('payouts')">Review</button>
-    </div>
-  </div>
+  <div id="attentionContainer">Loading…</div>
 </section>
 
 <!-- VENDORS -->
@@ -256,6 +233,53 @@ async function loadEverything(){
   await loadOrders();
   await loadPayouts();
   await loadRiders();
+  await loadOverview();
+}
+
+// ---- Overview ----
+async function loadOverview(){
+  const [{ data: allOrders }, { data: pendingVendors }, { data: activeRiders }, { data: pendingLedger }] = await Promise.all([
+    supabaseClient.from('orders').select('total, created_at'),
+    supabaseClient.from('vendors').select('id').eq('status', 'pending'),
+    supabaseClient.from('riders').select('id').eq('active', true),
+    supabaseClient.from('ledger_entries').select('id, amount').eq('status', 'available')
+  ]);
+
+  const orders = allOrders || [];
+  const todayStr = new Date().toDateString();
+  const ordersToday = orders.filter(o => new Date(o.created_at).toDateString() === todayStr).length;
+
+  const weekAgo = Date.now() - 7*24*60*60*1000;
+  const weekOrders = orders.filter(o => new Date(o.created_at).getTime() >= weekAgo);
+  const grossThisWeek = weekOrders.reduce((s,o)=>s+Number(o.total),0);
+  const platformShareEstimate = Math.round(grossThisWeek * 0.2);
+
+  const pendingCashoutTotal = (pendingLedger || []).reduce((s,e)=>s+Number(e.amount),0);
+
+  document.getElementById('metricGrid').innerHTML = `
+    <div class="metric-card wide">
+      <div><div class="n">₦${grossThisWeek.toLocaleString()}</div><div class="l">Gross order value, this week</div></div>
+      <div style="text-align:right;"><div class="n">₦${platformShareEstimate.toLocaleString()}</div><div class="l">Platform earnings (20%, est.)</div></div>
+    </div>
+    <div class="metric-card"><div class="n">${ordersToday}</div><div class="l">Orders today</div></div>
+    <div class="metric-card"><div class="n">${(pendingVendors||[]).length}</div><div class="l">Vendors pending review</div></div>
+    <div class="metric-card"><div class="n">${(activeRiders||[]).length}</div><div class="l">Active riders</div></div>
+    <div class="metric-card"><div class="n">₦${pendingCashoutTotal.toLocaleString()}</div><div class="l">Cash-outs pending approval</div></div>
+  `;
+
+  // Attention feed: pending vendors + available cash-outs, most recent first
+  const { data: vendorsPending } = await supabaseClient.from('vendors').select('id, name, category').eq('status','pending').limit(3);
+  const { data: ledgerPending } = await supabaseClient.from('ledger_entries').select('id, amount, vendors(name), riders(full_name), recipient_type').eq('status','available').limit(3);
+
+  let cards = '';
+  (vendorsPending||[]).forEach(v => {
+    cards += `<div class="card"><div class="top"><div><h4>${v.name}</h4><div class="meta">New vendor application · ${v.category}</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('vendors')">Review</button></div></div>`;
+  });
+  (ledgerPending||[]).forEach(e => {
+    const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    cards += `<div class="card"><div class="top"><div><h4>Cash-out · ${who}</h4><div class="meta">₦${Number(e.amount).toLocaleString()} requested · dispute window clear</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('payouts')">Review</button></div></div>`;
+  });
+  document.getElementById('attentionContainer').innerHTML = cards || '<div class="empty">Nothing needs attention right now.</div>';
 }
 
 // ---- Vendors ----
