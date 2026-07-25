@@ -39,6 +39,10 @@
   .screen.active{display:block;}
 
   .search-bar{display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:100px; padding:12px 16px; margin:16px 0; font-size:14px; color:var(--ink-soft);}
+  .cat-scroll{display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:6px; -ms-overflow-style:none; scrollbar-width:none;}
+  .cat-scroll::-webkit-scrollbar{display:none;}
+  .cat-pill{flex:0 0 auto; padding:9px 15px; border-radius:100px; background:#fff; border:1.5px solid var(--line); font-size:12.5px; font-weight:600; color:var(--plum); white-space:nowrap; cursor:pointer;}
+  .cat-pill.active{background:var(--plum); color:#fff; border-color:var(--plum);}
   .section-title{font-size:20px; font-weight:700; color:var(--plum); margin:22px 0 12px;}
 
   .store-list{display:flex; flex-direction:column; gap:14px;}
@@ -137,6 +141,15 @@
 
 <section class="screen active" id="screen-browse">
   <div class="search-bar">🔍 Search dishes, stores, medicine…</div>
+  <div class="cat-scroll">
+    <div class="cat-pill active" data-cat="">🍢 All</div>
+    <div class="cat-pill" data-cat="Local dishes">🍲 Local dishes</div>
+    <div class="cat-pill" data-cat="Grills & Suya">🍗 Grills & Suya</div>
+    <div class="cat-pill" data-cat="Chicken">🍗 Chicken</div>
+    <div class="cat-pill" data-cat="Drinks & Fura">🧉 Drinks & Fura</div>
+    <div class="cat-pill" data-cat="Desserts">🍰 Desserts</div>
+    <div class="cat-pill" data-cat="Pharmacy">💊 Pharmacy</div>
+  </div>
   <div class="section-title">Open now near you</div>
   <div class="store-list" id="storeList">
     <div class="empty-state"><div class="icon">⏳</div>Loading stores…</div>
@@ -370,9 +383,14 @@ async function loadStores(){
   }
 }
 
-function renderStores(){
+function renderStores(filterCat){
   const list = document.getElementById('storeList');
-  list.innerHTML = STORES.map(s => `
+  const filtered = filterCat ? STORES.filter(s => s.category === filterCat) : STORES;
+  if(filtered.length === 0){
+    list.innerHTML = `<div class="empty-state"><div class="icon">🏪</div>No stores in this category yet.</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(s => `
     <a href="#" class="store-row" onclick="openStore('${s.id}');return false;">
       <img src="${s.img}" alt="${s.name}">
       <div class="store-row-body">
@@ -382,6 +400,13 @@ function renderStores(){
     </a>
   `).join('');
 }
+
+document.querySelectorAll('.cat-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.toggle('active', p===pill));
+    renderStores(pill.dataset.cat);
+  });
+});
 
 function openStore(id){
   currentStore = STORES.find(s=>s.id===id);
