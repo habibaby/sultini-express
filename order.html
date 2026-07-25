@@ -348,14 +348,50 @@ async function loadOrderHistory(){
     .order('created_at', {ascending:false}).limit(20);
   const el = document.getElementById('orderHistoryList');
   if(!orders || orders.length === 0){ el.innerHTML = '<div style="font-size:12.5px; color:var(--ink-soft);">No orders yet.</div>'; return; }
-  el.innerHTML = orders.map(o => `
-    <div class="cart-item" style="align-items:flex-start;">
+
+  const { data: disputes } = await supabaseClient
+    .from('disputes').select('order_id, status').eq('raised_by', session.user.id);
+  const disputedOrderIds = new Set((disputes||[]).map(d => d.order_id));
+
+  const completedStatuses = ['delivered','picked_up','completed'];
+
+  el.innerHTML = orders.map(o => {
+    const canDispute = completedStatuses.includes(o.status);
+    let disputeSection = '';
+    if(disputedOrderIds.has(o.id)){
+      disputeSection = `<div style="font-size:11px; color:var(--amber); font-weight:700; margin-top:4px;">⚠ Dispute reported — we're looking into it</div>`;
+    } else if(canDispute){
+      disputeSection = `<button onclick="openDisputeForm('${o.id}')" style="background:none; border:none; color:var(--rose-deep); font-size:11px; font-weight:700; text-decoration:underline; padding:0; margin-top:4px;">Report a problem with this order</button>`;
+    }
+    return `
+    <div class="cart-item" style="align-items:flex-start; flex-direction:column; gap:6px;">
       <div class="cart-item-body">
         <h4 class="mono">${o.pickup_code}</h4>
         <div class="price">${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()} · ${o.status}</div>
       </div>
+      ${disputeSection}
+      <div id="disputeForm-${o.id}" style="display:none; width:100%; margin-top:6px;">
+        <textarea id="disputeReason-${o.id}" placeholder="What went wrong?" rows="3" style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px; font-family:inherit;"></textarea>
+        <button onclick="submitDispute('${o.id}')" class="btn btn-primary" style="margin-top:6px; padding:10px;">Submit report</button>
+      </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function openDisputeForm(orderId){
+  document.getElementById('disputeForm-'+orderId).style.display = 'block';
+}
+
+async function submitDispute(orderId){
+  const reason = document.getElementById('disputeReason-'+orderId).value.trim();
+  if(!reason){ alert('Please describe what went wrong.'); return; }
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const { error } = await supabaseClient.from('disputes').insert([{
+    order_id: orderId, raised_by: session.user.id, reason
+  }]);
+  if(error){ alert('Could not submit: ' + error.message); return; }
+  await loadOrderHistory();
 }
 
 async function loadSavedAddresses(){
