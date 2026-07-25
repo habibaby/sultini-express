@@ -273,8 +273,17 @@ let cart = {};
 let currentStore = null;
 let fulfilment = null;
 let pickupTime = null;
-const DELIVERY_FEE = 1500;
+let DELIVERY_FEE = 1500; // overwritten by loadPlatformSettings() below with the real admin-set value
+let COD_UNLOCK_COUNT = 5; // overwritten by loadPlatformSettings() below
 const CUSTOMER = { loggedIn: false, completedOrders: 0, email: null };
+
+async function loadPlatformSettings(){
+  const { data } = await supabaseClient.from('platform_settings').select('*');
+  (data||[]).forEach(s => {
+    if(s.key === 'delivery_fee') DELIVERY_FEE = Number(s.value);
+    if(s.key === 'cod_unlock_order_count') COD_UNLOCK_COUNT = Number(s.value);
+  });
+}
 
 async function refreshAuthState(){
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -302,9 +311,9 @@ function renderAccountScreen(){
   if(CUSTOMER.loggedIn){
     document.getElementById('accountEmailDisplay').textContent = CUSTOMER.email;
     document.getElementById('accountOrderCount').textContent =
-      CUSTOMER.completedOrders >= 5
+      CUSTOMER.completedOrders >= COD_UNLOCK_COUNT
         ? `${CUSTOMER.completedOrders} orders completed — cash on delivery unlocked`
-        : `${CUSTOMER.completedOrders}/5 orders completed toward cash on delivery`;
+        : `${CUSTOMER.completedOrders}/${COD_UNLOCK_COUNT} orders completed toward cash on delivery`;
   }
 }
 
@@ -496,7 +505,7 @@ function renderCartScreen(){
 }
 
 function updatePayOptions(){
-  const unlocked = CUSTOMER.loggedIn && CUSTOMER.completedOrders >= 5;
+  const unlocked = CUSTOMER.loggedIn && CUSTOMER.completedOrders >= COD_UNLOCK_COUNT;
   const codEl = document.getElementById('payCOD');
   const sub = document.getElementById('codSubtext');
   if(unlocked){ codEl.classList.remove('locked'); sub.textContent = 'Pay the rider or store when your order arrives'; }
@@ -566,7 +575,7 @@ document.getElementById('payOnline').addEventListener('click', ()=>{
   document.getElementById('payCOD').classList.remove('selected');
 });
 document.getElementById('payCOD').addEventListener('click', ()=>{
-  const unlocked = CUSTOMER.loggedIn && CUSTOMER.completedOrders >= 5;
+  const unlocked = CUSTOMER.loggedIn && CUSTOMER.completedOrders >= COD_UNLOCK_COUNT;
   if(!unlocked) return;
   document.getElementById('payCOD').classList.add('selected');
   document.getElementById('payOnline').classList.remove('selected');
@@ -660,6 +669,7 @@ function showConfirmation(pickupCode){
 }
 document.getElementById('backToBrowseBtn').addEventListener('click', ()=>{ showScreen('screen-browse', false); });
 
+loadPlatformSettings();
 loadStores();
 refreshAuthState();
 supabaseClient.auth.onAuthStateChange(() => refreshAuthState());
