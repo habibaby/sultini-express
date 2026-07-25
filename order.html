@@ -194,7 +194,11 @@
   </div>
   <div class="option-group" id="deliveryAddressGroup" style="display:none;">
     <div class="option-label">Delivery address</div>
+    <div id="checkoutSavedAddresses" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
     <input id="deliveryAddressInput" type="text" placeholder="e.g. No. 4 Runjin Sambo Road, Sokoto" class="search-bar" style="width:100%; text-align:left;">
+    <label id="saveAddressLabel" style="display:none; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); margin-top:8px;">
+      <input type="checkbox" id="saveAddressCheckbox"> Save this address for next time
+    </label>
   </div>
   <div class="option-group">
     <div class="option-label">Your details</div>
@@ -205,6 +209,7 @@
 
   <div class="option-group">
     <div class="option-label">Payment method</div>
+    <div id="savedCardPayOptions"></div>
     <div class="pay-option selected" id="payOnline">
       <div class="pay-radio"></div>
       <div class="pay-option-body"><strong>Pay online</strong><span>Paystack — card, bank transfer, or USSD</span></div>
@@ -249,12 +254,27 @@
     <div id="authError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
   </div>
   <div id="accountLoggedIn" style="display:none;">
-    <div class="empty-state">
+    <div class="empty-state" style="padding:30px 20px 10px;">
       <div class="icon">👤</div>
       <div id="accountEmailDisplay" style="font-weight:700; color:var(--ink);"></div>
       <div style="font-size:12.5px; margin-top:6px;" id="accountOrderCount"></div>
-      <button class="btn" id="logoutBtn" style="margin-top:20px; background:#fff; color:var(--plum); border:1.5px solid var(--line);">Log out</button>
+      <button class="btn" id="logoutBtn" style="margin-top:16px; background:#fff; color:var(--plum); border:1.5px solid var(--line); max-width:200px; margin-left:auto; margin-right:auto;">Log out</button>
     </div>
+
+    <div class="option-label" style="margin-top:26px;">Order history</div>
+    <div id="orderHistoryList"><div class="empty-state">Loading…</div></div>
+
+    <div class="option-label" style="margin-top:26px;">Saved addresses</div>
+    <div id="savedAddressList"></div>
+    <div id="addAddressForm" style="display:none; margin-top:10px;">
+      <input type="text" id="newAddressLabel" placeholder="Label (e.g. Home, Work)" class="search-bar" style="width:100%; text-align:left; margin-bottom:8px;">
+      <input type="text" id="newAddressText" placeholder="Full address" class="search-bar" style="width:100%; text-align:left; margin-bottom:8px;">
+      <button class="btn btn-primary" onclick="saveNewAddress()">Save address</button>
+    </div>
+    <button class="btn" onclick="document.getElementById('addAddressForm').style.display='block'; this.style.display='none';" id="showAddAddressBtn" style="background:#fff; color:var(--plum); border:1.5px solid var(--line); margin-top:8px;">＋ Add address</button>
+
+    <div class="option-label" style="margin-top:26px;">Saved cards</div>
+    <div id="savedCardList"><div style="font-size:12.5px; color:var(--ink-soft);">Cards are saved automatically after your first online payment.</div></div>
   </div>
 </section>
 
@@ -314,7 +334,91 @@ function renderAccountScreen(){
       CUSTOMER.completedOrders >= COD_UNLOCK_COUNT
         ? `${CUSTOMER.completedOrders} orders completed — cash on delivery unlocked`
         : `${CUSTOMER.completedOrders}/${COD_UNLOCK_COUNT} orders completed toward cash on delivery`;
+    loadOrderHistory();
+    loadSavedAddresses();
+    loadSavedCards();
   }
+}
+
+async function loadOrderHistory(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session) return;
+  const { data: orders } = await supabaseClient
+    .from('orders').select('*, vendors(name)').eq('customer_id', session.user.id)
+    .order('created_at', {ascending:false}).limit(20);
+  const el = document.getElementById('orderHistoryList');
+  if(!orders || orders.length === 0){ el.innerHTML = '<div style="font-size:12.5px; color:var(--ink-soft);">No orders yet.</div>'; return; }
+  el.innerHTML = orders.map(o => `
+    <div class="cart-item" style="align-items:flex-start;">
+      <div class="cart-item-body">
+        <h4 class="mono">${o.pickup_code}</h4>
+        <div class="price">${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()} · ${o.status}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadSavedAddresses(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session) return;
+  const { data: addresses } = await supabaseClient
+    .from('customer_addresses').select('*').eq('customer_id', session.user.id).order('created_at',{ascending:false});
+  window.savedAddresses = addresses || [];
+  const el = document.getElementById('savedAddressList');
+  if(!addresses || addresses.length === 0){ el.innerHTML = '<div style="font-size:12.5px; color:var(--ink-soft);">No saved addresses yet.</div>'; return; }
+  el.innerHTML = addresses.map(a => `
+    <div class="cart-item">
+      <div class="cart-item-body"><h4>${a.label || 'Address'}</h4><div class="price">${a.address}</div></div>
+      <button onclick="deleteSavedAddress('${a.id}')" style="background:none; border:none; color:var(--ink-soft); font-size:16px;">✕</button>
+    </div>
+  `).join('');
+}
+function renderCheckoutSavedAddresses(){
+  const el = document.getElementById('checkoutSavedAddresses');
+  if(!window.savedAddresses || window.savedAddresses.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = window.savedAddresses.map(a => `
+    <button type="button" class="option-card" style="text-align:left;" onclick="document.getElementById('deliveryAddressInput').value='${a.address.replace(/'/g,"\\'")}'">
+      <strong>${a.label || 'Address'}</strong>
+      <span>${a.address}</span>
+    </button>
+  `).join('');
+}
+
+async function saveNewAddress(){
+  const label = document.getElementById('newAddressLabel').value.trim() || 'Address';
+  const address = document.getElementById('newAddressText').value.trim();
+  if(!address) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  await supabaseClient.from('customer_addresses').insert([{ customer_id: session.user.id, label, address }]);
+  document.getElementById('newAddressLabel').value = '';
+  document.getElementById('newAddressText').value = '';
+  document.getElementById('addAddressForm').style.display = 'none';
+  document.getElementById('showAddAddressBtn').style.display = 'block';
+  await loadSavedAddresses();
+}
+async function deleteSavedAddress(id){
+  await supabaseClient.from('customer_addresses').delete().eq('id', id);
+  await loadSavedAddresses();
+}
+
+async function loadSavedCards(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session) return;
+  const { data: cards } = await supabaseClient
+    .from('customer_cards').select('*').eq('customer_id', session.user.id).order('created_at',{ascending:false});
+  window.savedCards = cards || [];
+  const el = document.getElementById('savedCardList');
+  if(!cards || cards.length === 0){ el.innerHTML = '<div style="font-size:12.5px; color:var(--ink-soft);">Cards are saved automatically after your first online payment.</div>'; return; }
+  el.innerHTML = cards.map(c => `
+    <div class="cart-item">
+      <div class="cart-item-body"><h4>${(c.card_type||'Card').toUpperCase()} •••• ${c.last4 || '····'}</h4><div class="price">${c.bank || ''}</div></div>
+      <button onclick="deleteSavedCard('${c.id}')" style="background:none; border:none; color:var(--ink-soft); font-size:16px;">✕</button>
+    </div>
+  `).join('');
+}
+async function deleteSavedCard(id){
+  await supabaseClient.from('customer_cards').delete().eq('id', id);
+  await loadSavedCards();
 }
 
 document.getElementById('accountBtn').addEventListener('click', ()=>{
@@ -541,17 +645,39 @@ document.getElementById('backBtn').addEventListener('click', ()=>{
 });
 document.getElementById('cartBtn').addEventListener('click', ()=>{ renderCartScreen(); showScreen('screen-cart', true); });
 document.getElementById('cartBarView').addEventListener('click', ()=>{ renderCartScreen(); showScreen('screen-cart', true); });
+let selectedSavedCardId = null;
+
 document.getElementById('toCheckoutBtn').addEventListener('click', ()=>{
   if(Object.keys(cart).length===0) return;
-  updatePayOptions(); renderSummary();
+  updatePayOptions(); renderSummary(); renderSavedCardPayOptions();
   showScreen('screen-checkout', true);
 });
+
+function renderSavedCardPayOptions(){
+  const el = document.getElementById('savedCardPayOptions');
+  if(!window.savedCards || window.savedCards.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = window.savedCards.map(c => `
+    <div class="pay-option" data-card-id="${c.id}" onclick="selectSavedCard('${c.id}')">
+      <div class="pay-radio"></div>
+      <div class="pay-option-body"><strong>${(c.card_type||'Card').toUpperCase()} •••• ${c.last4||'····'}</strong><span>Charge this saved card — no popup needed</span></div>
+    </div>
+  `).join('');
+}
+
+function selectSavedCard(cardId){
+  selectedSavedCardId = cardId;
+  document.querySelectorAll('#savedCardPayOptions .pay-option').forEach(el => el.classList.toggle('selected', el.dataset.cardId === cardId));
+  document.getElementById('payOnline').classList.remove('selected');
+  document.getElementById('payCOD').classList.remove('selected');
+}
 document.getElementById('optDelivery').addEventListener('click', ()=>{
   fulfilment='delivery';
   document.getElementById('optDelivery').classList.add('selected');
   document.getElementById('optPickup').classList.remove('selected');
   document.getElementById('pickupTimeGroup').style.display='none';
   document.getElementById('deliveryAddressGroup').style.display='block';
+  renderCheckoutSavedAddresses();
+  document.getElementById('saveAddressLabel').style.display = CUSTOMER.loggedIn ? 'flex' : 'none';
   renderSummary();
 });
 document.getElementById('optPickup').addEventListener('click', ()=>{
@@ -571,12 +697,16 @@ document.querySelectorAll('.time-chip').forEach(chip=>{
   });
 });
 document.getElementById('payOnline').addEventListener('click', ()=>{
+  selectedSavedCardId = null;
+  document.querySelectorAll('#savedCardPayOptions .pay-option').forEach(el => el.classList.remove('selected'));
   document.getElementById('payOnline').classList.add('selected');
   document.getElementById('payCOD').classList.remove('selected');
 });
 document.getElementById('payCOD').addEventListener('click', ()=>{
   const unlocked = CUSTOMER.loggedIn && CUSTOMER.completedOrders >= COD_UNLOCK_COUNT;
   if(!unlocked) return;
+  selectedSavedCardId = null;
+  document.querySelectorAll('#savedCardPayOptions .pay-option').forEach(el => el.classList.remove('selected'));
   document.getElementById('payCOD').classList.add('selected');
   document.getElementById('payOnline').classList.remove('selected');
 });
@@ -598,11 +728,18 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
     return;
   }
 
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  // Save the address for next time, if requested
+  if(fulfilment==='delivery' && session && document.getElementById('saveAddressCheckbox').checked){
+    const addr = document.getElementById('deliveryAddressInput').value.trim();
+    await supabaseClient.from('customer_addresses').insert([{ customer_id: session.user.id, label: 'Address', address: addr }]);
+  }
+
   const {subtotal} = cartTotals();
   const deliveryFee = fulfilment==='delivery' ? DELIVERY_FEE : 0;
   const total = subtotal + deliveryFee;
   const vendorId = Object.values(cart)[0].store.id; // NOTE: assumes single-vendor cart for now
-  const { data: { session } } = await supabaseClient.auth.getSession();
 
   const orderPayload = {
     vendorId,
@@ -618,8 +755,29 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   };
 
   const placeBtn = document.getElementById('placeOrderBtn');
-  placeBtn.textContent = 'Opening payment…';
+  placeBtn.textContent = selectedSavedCardId ? 'Charging card…' : 'Opening payment…';
   placeBtn.classList.add('disabled');
+
+  if(selectedSavedCardId){
+    const card = window.savedCards.find(c => c.id === selectedSavedCardId);
+    try {
+      const resp = await fetch('/api/charge-saved-card', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ authorizationCode: card.authorization_code, email: guestEmail, order: orderPayload })
+      });
+      const result = await resp.json();
+      if(!resp.ok) throw new Error(result.error || 'Could not charge saved card');
+      showConfirmation(result.pickupCode);
+    } catch (err) {
+      console.error(err);
+      alert('Could not charge that card: ' + err.message);
+    } finally {
+      placeBtn.textContent = 'Place order';
+      placeBtn.classList.remove('disabled');
+    }
+    return;
+  }
 
   const popup = new PaystackPop();
   popup.newTransaction({
