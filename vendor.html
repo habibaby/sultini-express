@@ -177,10 +177,14 @@
     </label>
   </div>
   <div class="field">
-    <label>Store type</label>
-    <div class="cat-select-grid">
-      <button class="cat-select" data-cat="restaurant">🍲 Restaurant</button>
-      <button class="cat-select" data-cat="pharmacy">💊 Pharmacy</button>
+    <label>Store category</label>
+    <div class="cat-select-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <button class="cat-select" data-cat="Local dishes">🍲 Local dishes</button>
+      <button class="cat-select" data-cat="Grills & Suya">🍢 Grills & Suya</button>
+      <button class="cat-select" data-cat="Chicken">🍗 Chicken</button>
+      <button class="cat-select" data-cat="Drinks & Fura">🧉 Drinks & Fura</button>
+      <button class="cat-select" data-cat="Desserts">🍰 Desserts</button>
+      <button class="cat-select" data-cat="Pharmacy">💊 Pharmacy</button>
     </div>
   </div>
   <div class="field-row">
@@ -486,7 +490,7 @@ async function submitRegistration(){
     cover_image_url = urlData.publicUrl;
   }
 
-  const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'restaurant';
+  const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'Local dishes';
   const { data: vendorRows, error: vErr } = await supabaseClient.from('vendors').insert([{
     owner_id: session.user.id,
     name: document.getElementById('bizName').value.trim(),
