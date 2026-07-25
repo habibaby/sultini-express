@@ -106,6 +106,7 @@
   <div class="nav-row">
     <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
     <span class="tag-admin">Admin</span>
+    <button onclick="go('settings')" style="background:none; border:none; font-size:18px; margin-left:8px;">⚙️</button>
   </div>
 </header>
 
@@ -221,6 +222,13 @@
   <div id="vdOrderList"></div>
 </section>
 
+<!-- DISPUTES -->
+<section class="page" id="page-disputes">
+  <div class="page-title">Disputes</div>
+  <div class="page-sub">Customer complaints — payouts are held automatically until resolved</div>
+  <div id="disputesContainer">Loading…</div>
+</section>
+
 <!-- SETTINGS -->
 <section class="page" id="page-settings">
   <div class="page-title">Settings</div>
@@ -234,11 +242,11 @@
 
 <div class="bottom-nav">
   <button class="active" data-p="overview" onclick="go('overview')"><span class="ic">📊</span>Overview</button>
-  <button class="badge-dot" data-n="3" data-p="vendors" onclick="go('vendors')"><span class="ic">🏪</span>Vendors</button>
+  <button class="badge-dot" data-n="0" id="vendorsNavBadge" data-p="vendors" onclick="go('vendors')"><span class="ic">🏪</span>Vendors</button>
   <button data-p="orders" onclick="go('orders')"><span class="ic">🧾</span>Orders</button>
-  <button class="badge-dot" data-n="2" data-p="payouts" onclick="go('payouts')"><span class="ic">💳</span>Payouts</button>
+  <button class="badge-dot" data-n="0" id="payoutsNavBadge" data-p="payouts" onclick="go('payouts')"><span class="ic">💳</span>Payouts</button>
   <button data-p="riders" onclick="go('riders')"><span class="ic">🛵</span>Riders</button>
-  <button data-p="settings" onclick="go('settings')"><span class="ic">⚙️</span>Settings</button>
+  <button class="badge-dot" data-n="0" id="disputesNavBadge" data-p="disputes" onclick="go('disputes')"><span class="ic">⚠️</span>Disputes</button>
 </div>
 
 <script src="supabase-config.js"></script>
@@ -276,6 +284,7 @@ async function loadEverything(){
   await loadOrders();
   await loadPayouts();
   await loadRiders();
+  await loadDisputes();
   await loadOverview();
 }
 
@@ -334,6 +343,10 @@ let platformSettings = {};
 async function loadVendors(){
   const { data: vendors } = await supabaseClient.from('vendors').select('*').order('created_at', {ascending:false});
   allVendorsData = vendors || [];
+  const pendingCount = allVendorsData.filter(v=>v.status==='pending').length;
+  const badge = document.getElementById('vendorsNavBadge');
+  if(pendingCount > 0){ badge.dataset.n = pendingCount; badge.classList.add('badge-dot'); }
+  else { badge.classList.remove('badge-dot'); }
   filterAndRenderVendors();
 }
 
@@ -534,12 +547,22 @@ async function markDelivered(orderId, vendorId, deliveryFee){
 async function loadPayouts(){
   const { data: entries } = await supabaseClient
     .from('ledger_entries').select('*, vendors(name), riders(full_name)')
-    .in('status', ['available','cashout_requested','in_dispute_window'])
+    .in('status', ['available','cashout_requested','in_dispute_window','held'])
     .order('created_at', {ascending:false}).limit(30);
+
+  const actionable = (entries||[]).filter(e => e.status==='available' || e.status==='cashout_requested').length;
+  const payoutsBadge = document.getElementById('payoutsNavBadge');
+  if(actionable > 0){ payoutsBadge.dataset.n = actionable; payoutsBadge.classList.add('badge-dot'); }
+  else { payoutsBadge.classList.remove('badge-dot'); }
+
   const el = document.getElementById('payoutsContainer');
   if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No pending cash-outs.</div>'; return; }
   el.innerHTML = entries.map(e => {
     const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    if(e.status==='held'){
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ Held — customer dispute open</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="row-actions"><button onclick="go('disputes')">Review dispute</button><button class="primary" onclick="setLedgerStatus('${e.id}','available')">Release hold</button></div></div>`;
+    }
     if(e.status==='in_dispute_window'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Still in dispute window</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
     }
@@ -552,6 +575,41 @@ async function loadPayouts(){
     </div>`;
   }).join('');
 }
+
+// ---- Disputes ----
+async function loadDisputes(){
+  const { data: disputes } = await supabaseClient
+    .from('disputes').select('*, orders(pickup_code, total, vendor_id, vendors(name))')
+    .order('created_at', {ascending:false});
+  const open = (disputes||[]).filter(d => d.status === 'open');
+  const resolved = (disputes||[]).filter(d => d.status !== 'open');
+
+  const badge = document.getElementById('disputesNavBadge');
+  if(open.length > 0){ badge.dataset.n = open.length; badge.classList.add('badge-dot'); }
+  else { badge.classList.remove('badge-dot'); }
+
+  const el = document.getElementById('disputesContainer');
+  if(!disputes || disputes.length === 0){ el.innerHTML = '<div class="empty">No disputes filed.</div>'; return; }
+
+  el.innerHTML =
+    `<div class="section-label">Open (${open.length})</div>` +
+    (open.length ? open.map(d => `
+      <div class="card">
+        <div class="top"><div><div class="id">${d.orders?.pickup_code||''}</div><h4>${d.orders?.vendors?.name||'Store'} · ₦${Number(d.orders?.total||0).toLocaleString()}</h4><div class="meta">${d.reason}</div></div><span class="pill flag">Open</span></div>
+        <div class="row-actions"><button class="primary" onclick="resolveDispute('${d.id}')">Mark resolved</button></div>
+      </div>
+    `).join('') : '<div class="empty">None open.</div>') +
+    `<div class="section-label">Resolved</div>` +
+    (resolved.length ? resolved.map(d => `
+      <div class="card"><div class="top"><div><div class="id">${d.orders?.pickup_code||''}</div><h4>${d.orders?.vendors?.name||'Store'}</h4><div class="meta">${d.reason}</div></div><span class="pill done">Resolved</span></div></div>
+    `).join('') : '<div class="empty">None yet.</div>');
+}
+
+async function resolveDispute(id){
+  await supabaseClient.from('disputes').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id);
+  await loadDisputes();
+}
+
 async function setLedgerStatus(id, status){
   await supabaseClient.from('ledger_entries').update({ status, paid_at: status==='paid' ? new Date().toISOString() : null }).eq('id', id);
   await loadPayouts();
