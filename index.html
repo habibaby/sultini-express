@@ -413,12 +413,13 @@
 </div>
 
 <div class="cat-scroll wrap" style="padding-left:20px; padding-right:20px; margin-top:18px;">
-  <div class="cat-pill active">🍢 All</div>
-  <div class="cat-pill">🍲 Local dishes</div>
-  <div class="cat-pill">🥘 Rice & swallow</div>
-  <div class="cat-pill">🍗 Grills & suya</div>
-  <div class="cat-pill">🧉 Drinks & fura</div>
-  <div class="cat-pill">💊 Pharmacy</div>
+  <div class="cat-pill active" data-cat="">🍢 All</div>
+  <div class="cat-pill" data-cat="Local dishes">🍲 Local dishes</div>
+  <div class="cat-pill" data-cat="Grills & Suya">🍗 Grills & Suya</div>
+  <div class="cat-pill" data-cat="Chicken">🍗 Chicken</div>
+  <div class="cat-pill" data-cat="Drinks & Fura">🧉 Drinks & Fura</div>
+  <div class="cat-pill" data-cat="Desserts">🍰 Desserts</div>
+  <div class="cat-pill" data-cat="Pharmacy">💊 Pharmacy</div>
 </div>
 
 <section id="categories">
@@ -427,27 +428,27 @@
     <h2>Our categories</h2>
   </div>
   <div class="cat-grid">
-    <a href="#stores" class="cat-card">
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Local dishes');return false;">
       <img src="https://images.unsplash.com/photo-1757715376249-b2a3e943cdf5?auto=format&fit=crop&w=500&q=70" alt="Local dishes and rice plate">
       <span class="cat-card-label">Local dishes</span>
     </a>
-    <a href="#stores" class="cat-card">
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Grills & Suya');return false;">
       <img src="https://images.unsplash.com/photo-1767974968707-db3d448d4ef3?auto=format&fit=crop&w=500&q=70" alt="Grilled suya skewers">
-      <span class="cat-card-label">Grills & suya</span>
+      <span class="cat-card-label">Grills & Suya</span>
     </a>
-    <a href="#stores" class="cat-card">
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Chicken');return false;">
       <img src="https://images.unsplash.com/photo-1616401616927-3c81de22dfa8?auto=format&fit=crop&w=500&q=70" alt="Roast chicken">
       <span class="cat-card-label">Chicken</span>
     </a>
-    <a href="#stores" class="cat-card">
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Drinks & Fura');return false;">
       <img src="https://images.unsplash.com/photo-1552286970-62449522d6f3?auto=format&fit=crop&w=500&q=70" alt="Smoothie drink">
-      <span class="cat-card-label">Drinks & fura</span>
+      <span class="cat-card-label">Drinks & Fura</span>
     </a>
-    <a href="#stores" class="cat-card">
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Desserts');return false;">
       <img src="https://images.unsplash.com/photo-1555526148-5cd740b44241?auto=format&fit=crop&w=500&q=70" alt="Desserts plate">
       <span class="cat-card-label">Desserts</span>
     </a>
-    <a href="#stores" class="cat-card">
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Pharmacy');return false;">
       <img src="https://images.unsplash.com/photo-1696861286643-341a8d7a79e9?auto=format&fit=crop&w=500&q=70" alt="Pharmacy shelf">
       <span class="cat-card-label">Pharmacy</span>
     </a>
@@ -531,19 +532,26 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script>
+let allHomepageVendors = [];
+
 async function loadHomepageStores(){
   const { data: vendors } = await supabaseClient
-    .from('vendors').select('*').eq('status', 'approved').limit(6);
+    .from('vendors').select('*').eq('status', 'approved');
+  allHomepageVendors = vendors || [];
+  renderHomepageStores(allHomepageVendors);
+}
+
+function renderHomepageStores(vendors){
   const grid = document.getElementById('storeGrid');
   if(!vendors || vendors.length === 0){
-    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">No stores live yet — check back soon.</div>';
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">No stores match that category yet.</div>';
     return;
   }
-  grid.innerHTML = vendors.map(v => `
+  grid.innerHTML = vendors.slice(0,6).map(v => `
     <a href="order.html?store=${v.id}" class="store-card" style="display:block;">
       <div class="store-img">
         <img src="${v.cover_image_url || ''}" alt="${v.name}" style="background:var(--stone);">
-        <span class="store-badge ${v.category==='pharmacy'?'rx':''}">${v.category==='pharmacy' ? 'Pharmacy · 20 min' : '15–25 min'}</span>
+        <span class="store-badge ${v.category==='Pharmacy'?'rx':''}">${v.category==='Pharmacy' ? 'Pharmacy · 20 min' : '15–25 min'}</span>
       </div>
       <div class="store-body">
         <h3>${v.name}</h3>
@@ -552,6 +560,20 @@ async function loadHomepageStores(){
     </a>
   `).join('');
 }
+
+function filterByCategory(category){
+  document.querySelectorAll('.cat-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.cat === category);
+  });
+  const filtered = category ? allHomepageVendors.filter(v => v.category === category) : allHomepageVendors;
+  renderHomepageStores(filtered);
+  document.getElementById('stores').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+document.querySelectorAll('.cat-pill').forEach(pill => {
+  pill.addEventListener('click', () => filterByCategory(pill.dataset.cat));
+});
+
 loadHomepageStores();
 </script>
 
