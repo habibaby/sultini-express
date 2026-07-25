@@ -362,6 +362,13 @@ async function loadStores(){
     }))
   }));
   renderStores();
+
+  // If we arrived here from a homepage store card, jump straight to that store's menu
+  const urlParams = new URLSearchParams(window.location.search);
+  const requestedStoreId = urlParams.get('store');
+  if(requestedStoreId && STORES.find(s => s.id === requestedStoreId)){
+    openStore(requestedStoreId);
+  }
 }
 
 function renderStores(){
