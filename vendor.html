@@ -164,6 +164,9 @@
   <div class="progress"><div class="seg done"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
   <div class="step-title">Tell us about your store</div>
   <div class="step-sub">This is what customers will see first.</div>
+  <div style="text-align:right; margin-bottom:14px;">
+    <button onclick="vendorEscapeLogout()" style="background:none; border:none; color:var(--ink-soft); font-size:12px; text-decoration:underline;">Not registering a store right now? Log out</button>
+  </div>
 
   <div class="field">
     <label>Store name</label>
@@ -453,6 +456,13 @@ async function vendorSignup(){
   if(error){ err.textContent = error.message; return; }
   err.style.color = 'var(--green)';
   err.textContent = 'Account created — check your email to confirm, then log in.';
+}
+
+async function vendorEscapeLogout(){
+  await supabaseClient.auth.signOut();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-auth').classList.add('active');
+  document.getElementById('backBtn').style.visibility = 'hidden';
 }
 
 async function afterLogin(){
