@@ -307,8 +307,7 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
   errEl.textContent = '';
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ errEl.textContent = error.message; return; }
-  await refreshAuthState();
-  showScreen('screen-browse', false); // back to shopping, not stuck on the account screen
+  await refreshAuthState(); // updates the account screen in place to show you're logged in
 });
 
 document.getElementById('signupBtn').addEventListener('click', async ()=>{
