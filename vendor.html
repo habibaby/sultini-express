@@ -592,13 +592,16 @@ async function loadOrders(){
       </div>
       <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
       ${o.status==='new' ? `<div class="order-actions"><button onclick="updateOrderStatus('${o.id}','rejected')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
-      ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready')">Mark as ready</button></div>` : ''}
+      ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}')">Mark as ready</button></div>` : ''}
     </div>
   `).join('');
 }
-async function updateOrderStatus(orderId, status){
+async function updateOrderStatus(orderId, status, pickupCode){
   await supabaseClient.from('orders').update({ status }).eq('id', orderId);
   notifyCustomer(orderId, status);
+  if(status === 'ready'){
+    notifyAdmin('Order ready', `Order ${pickupCode || orderId} is marked ready.`);
+  }
   await loadOrders();
 }
 
