@@ -119,7 +119,22 @@
   <div class="field"><label>Email</label><input type="email" id="aAuthEmail"></div>
   <div class="field"><label>Password</label><input type="password" id="aAuthPassword"></div>
   <button class="btn" onclick="adminLogin()">Log in</button>
+  <button type="button" onclick="showForgotPassword()" style="background:none; border:none; color:var(--ink-soft); font-size:12.5px; text-decoration:underline; margin-top:10px; display:block; width:100%; text-align:center;">Forgot password?</button>
   <div id="aAuthError" style="color:var(--red); font-size:12.5px; margin-top:10px;"></div>
+
+  <div id="forgotPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+    <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Enter your email and we'll send you a reset link.</div>
+    <div class="field"><input type="email" id="forgotEmail" placeholder="Email"></div>
+    <button class="btn" onclick="sendPasswordReset()">Send reset link</button>
+    <div id="forgotPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+  </div>
+
+  <div id="resetPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+    <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Choose a new password.</div>
+    <div class="field"><input type="password" id="newPassword" placeholder="New password"></div>
+    <button class="btn" onclick="submitNewPassword()">Set new password</button>
+    <div id="resetPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+  </div>
 </section>
 
 <!-- OVERVIEW -->
@@ -277,6 +292,42 @@ function go(page){
   document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active', b.dataset.p===page));
   window.scrollTo(0,0);
 }
+
+function showForgotPassword(){
+  document.getElementById('forgotPasswordForm').style.display = 'block';
+}
+
+async function sendPasswordReset(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotPasswordMsg');
+  if(!email){ msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Please enter your email.'; return; }
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/admin.html'
+  });
+  if(error){ msgEl.style.color = 'var(--red)'; msgEl.textContent = error.message; return; }
+  msgEl.style.color = 'var(--green, #4E8B5C)';
+  msgEl.textContent = 'Check your email for a reset link.';
+}
+
+async function submitNewPassword(){
+  const newPassword = document.getElementById('newPassword').value;
+  const msgEl = document.getElementById('resetPasswordMsg');
+  if(!newPassword || newPassword.length < 6){ msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Password must be at least 6 characters.'; return; }
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if(error){ msgEl.style.color = 'var(--red)'; msgEl.textContent = error.message; return; }
+  msgEl.style.color = 'var(--green, #4E8B5C)';
+  msgEl.textContent = 'Password updated! You can now use it to log in.';
+  document.getElementById('resetPasswordForm').style.display = 'none';
+}
+
+supabaseClient.auth.onAuthStateChange((event) => {
+  if(event === 'PASSWORD_RECOVERY'){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-auth').classList.add('active');
+    document.getElementById('forgotPasswordForm').style.display = 'none';
+    document.getElementById('resetPasswordForm').style.display = 'block';
+  }
+});
 
 async function adminLogin(){
   const email = document.getElementById('aAuthEmail').value.trim();
