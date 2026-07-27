@@ -254,7 +254,22 @@
     <input id="authFullName" type="text" placeholder="Full name (signup only)" class="search-bar" style="width:100%; text-align:left; margin-bottom:10px;">
     <button class="btn btn-primary" id="loginBtn" style="margin-bottom:10px;">Log in</button>
     <button class="btn" id="signupBtn" style="background:#fff; color:var(--plum); border:1.5px solid var(--line);">Sign up instead</button>
+    <button type="button" onclick="showForgotPassword()" style="background:none; border:none; color:var(--ink-soft); font-size:12.5px; text-decoration:underline; margin-top:10px; display:block; width:100%; text-align:center;">Forgot password?</button>
     <div id="authError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
+
+    <div id="forgotPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+      <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Enter your email and we'll send you a reset link.</div>
+      <input id="forgotEmail" type="email" placeholder="Email" class="search-bar" style="width:100%; text-align:left; margin-bottom:10px;">
+      <button class="btn btn-primary" onclick="sendPasswordReset()">Send reset link</button>
+      <div id="forgotPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+    </div>
+
+    <div id="resetPasswordForm" style="display:none;">
+      <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Choose a new password.</div>
+      <input id="newPassword" type="password" placeholder="New password" class="search-bar" style="width:100%; text-align:left; margin-bottom:10px;">
+      <button class="btn btn-primary" onclick="submitNewPassword()">Set new password</button>
+      <div id="resetPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+    </div>
   </div>
   <div id="accountLoggedIn" style="display:none;">
     <div class="empty-state" style="padding:30px 20px 10px;">
@@ -307,6 +322,43 @@ async function loadPlatformSettings(){
     if(s.key === 'cod_unlock_order_count') COD_UNLOCK_COUNT = Number(s.value);
   });
 }
+
+function showForgotPassword(){
+  document.getElementById('forgotPasswordForm').style.display = 'block';
+}
+
+async function sendPasswordReset(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotPasswordMsg');
+  if(!email){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = 'Please enter your email.'; return; }
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/order.html?screen=account'
+  });
+  if(error){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = error.message; return; }
+  msgEl.style.color = 'var(--green)';
+  msgEl.textContent = 'Check your email for a reset link.';
+}
+
+async function submitNewPassword(){
+  const newPassword = document.getElementById('newPassword').value;
+  const msgEl = document.getElementById('resetPasswordMsg');
+  if(!newPassword || newPassword.length < 6){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = 'Password must be at least 6 characters.'; return; }
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if(error){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = error.message; return; }
+  msgEl.style.color = 'var(--green)';
+  msgEl.textContent = 'Password updated! You can now use it to log in.';
+  document.getElementById('resetPasswordForm').style.display = 'none';
+}
+
+supabaseClient.auth.onAuthStateChange((event) => {
+  if(event === 'PASSWORD_RECOVERY'){
+    document.getElementById('accountLoggedOut').style.display = 'block';
+    document.getElementById('accountLoggedIn').style.display = 'none';
+    document.getElementById('forgotPasswordForm').style.display = 'none';
+    document.getElementById('resetPasswordForm').style.display = 'block';
+    showScreen('screen-account', false);
+  }
+});
 
 async function refreshAuthState(){
   const { data: { session } } = await supabaseClient.auth.getSession();
