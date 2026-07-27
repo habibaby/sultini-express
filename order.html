@@ -725,8 +725,32 @@ let selectedSavedCardId = null;
 document.getElementById('toCheckoutBtn').addEventListener('click', ()=>{
   if(Object.keys(cart).length===0) return;
   updatePayOptions(); renderSummary(); renderSavedCardPayOptions();
+  prefillCheckoutDetails();
   showScreen('screen-checkout', true);
 });
+
+async function prefillCheckoutDetails(){
+  if(!CUSTOMER.loggedIn) return;
+  const emailField = document.getElementById('guestEmail');
+  const nameField = document.getElementById('guestName');
+  const phoneField = document.getElementById('guestPhone');
+  if(!emailField.value) emailField.value = CUSTOMER.email;
+
+  // Reuse name/phone from their most recent order, if they have one,
+  // so returning customers don't have to retype it every time.
+  if(!nameField.value || !phoneField.value){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if(!session) return;
+    const { data: lastOrders } = await supabaseClient
+      .from('orders').select('guest_name, guest_phone')
+      .eq('customer_id', session.user.id)
+      .order('created_at', {ascending:false}).limit(1);
+    if(lastOrders && lastOrders[0]){
+      if(!nameField.value) nameField.value = lastOrders[0].guest_name || '';
+      if(!phoneField.value) phoneField.value = lastOrders[0].guest_phone || '';
+    }
+  }
+}
 
 function renderSavedCardPayOptions(){
   const el = document.getElementById('savedCardPayOptions');
