@@ -106,7 +106,11 @@
   </div>
 
   <div id="tab-deliveries">
-    <div class="note">Orders assigned to you by admin show here — update the status as you go.</div>
+    <div class="note">Ready to deliver? Claim an open delivery below — first come, first served.</div>
+    <div class="section-label" style="font-size:12.5px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:14px 0 8px;">Available deliveries</div>
+    <div id="availableDeliveryList"><div class="empty">Loading…</div></div>
+
+    <div class="section-label" style="font-size:12.5px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:22px 0 8px;">Your deliveries</div>
     <div id="deliveryList"><div class="empty">Loading…</div></div>
   </div>
 
@@ -153,6 +157,7 @@ async function afterRiderLogin(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-dashboard').classList.add('active');
   document.getElementById('riderNameTitle').textContent = currentRider.full_name;
+  await loadAvailableDeliveries();
   await loadDeliveries();
   await loadRiderEarnings();
 }
@@ -167,6 +172,34 @@ function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
   document.getElementById('tab-deliveries').style.display = tab==='deliveries' ? 'block':'none';
   document.getElementById('tab-earnings').style.display = tab==='earnings' ? 'block':'none';
+}
+
+async function loadAvailableDeliveries(){
+  const { data: orders } = await supabaseClient
+    .from('orders').select('*, vendors(name, address)')
+    .eq('status', 'ready').eq('fulfilment', 'delivery').is('rider_id', null)
+    .order('created_at', {ascending:true}).limit(20);
+  const el = document.getElementById('availableDeliveryList');
+  if(!orders || orders.length === 0){ el.innerHTML = '<div class="empty">No deliveries available right now.</div>'; return; }
+  el.innerHTML = orders.map(o => `
+    <div class="order-card">
+      <div class="top">
+        <div><div class="oid">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4></div>
+      </div>
+      <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}</div>
+      <div class="order-actions"><button class="primary" onclick="claimDelivery('${o.id}')">Accept this delivery</button></div>
+    </div>
+  `).join('');
+}
+
+async function claimDelivery(orderId){
+  const { error } = await supabaseClient
+    .from('orders')
+    .update({ rider_id: currentRider.id, status: 'out_for_delivery' })
+    .eq('id', orderId);
+  if(error){ alert('Could not claim this delivery — someone else may have just taken it.'); }
+  await loadAvailableDeliveries();
+  await loadDeliveries();
 }
 
 async function loadDeliveries(){
