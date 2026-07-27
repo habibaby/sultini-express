@@ -210,6 +210,14 @@
   <div class="page-title" id="vendorDetailTitle">Store</div>
   <div class="page-sub">View and edit this store's details</div>
 
+  <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+    <label style="cursor:pointer;">
+      <img id="vdStorePhoto" src="" alt="" style="width:64px; height:64px; border-radius:14px; object-fit:cover; background:var(--stone);">
+      <input type="file" accept="image/*" style="display:none;" onchange="changeVendorPhoto(this)">
+    </label>
+    <div style="font-size:12px; color:var(--ink-soft);">Tap the photo to upload or replace this store's cover image.</div>
+  </div>
+
   <div class="section-label">Store details</div>
   <div class="field"><label>Name</label><input type="text" id="vdName"></div>
   <div class="field"><label>Category</label><select id="vdCategorySelect" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select></div>
@@ -436,6 +444,7 @@ async function viewVendorDetail(id){
   window.scrollTo(0,0);
 
   document.getElementById('vendorDetailTitle').textContent = v.name;
+  document.getElementById('vdStorePhoto').src = v.cover_image_url || '';
   document.getElementById('vdName').value = v.name || '';
   document.getElementById('vdPhone').value = v.phone || '';
   document.getElementById('vdWhatsapp').value = v.whatsapp || '';
@@ -456,6 +465,24 @@ async function viewVendorDetail(id){
   document.getElementById('vdOrderList').innerHTML = (vendorOrders && vendorOrders.length)
     ? vendorOrders.map(o => `<div class="rider-row"><div><div class="n mono">${o.pickup_code}</div><div class="m">${o.fulfilment} · ₦${Number(o.total).toLocaleString()}</div></div><span class="pill done">${o.status}</span></div>`).join('')
     : '<div class="empty">No orders yet.</div>';
+}
+
+function safeFileName(originalName){
+  const extMatch = originalName.match(/\.[a-zA-Z0-9]+$/);
+  const ext = extMatch ? extMatch[0].toLowerCase() : '.jpg';
+  return `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+}
+
+async function changeVendorPhoto(inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  const path = `stores/${currentDetailVendorId}-${safeFileName(file.name)}`;
+  const { error } = await supabaseClient.storage.from('menu-photos').upload(path, file);
+  if(error){ alert('Photo upload failed: ' + error.message); return; }
+  const { data } = supabaseClient.storage.from('menu-photos').getPublicUrl(path);
+  await supabaseClient.from('vendors').update({ cover_image_url: data.publicUrl }).eq('id', currentDetailVendorId);
+  document.getElementById('vdStorePhoto').src = data.publicUrl;
+  await loadVendors();
 }
 
 async function saveVendorDetail(){
