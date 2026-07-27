@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sultini Express — Rider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --plum:#6B5058; --plum-deep:#3E2E33;
+    --rose:#C6577A; --rose-deep:#A8425F;
+    --stone:#E7D4CE; --blush:#FBEEEC; --ink:#2E2528; --ink-soft:#8A7A7E;
+    --line:rgba(107,80,88,0.14); --radius:16px;
+    --green:#4E8B5C; --amber:#B8863C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Inter',sans-serif; background:var(--blush); color:var(--ink); -webkit-font-smoothing:antialiased; padding-bottom:30px;}
+  h1,h2,h3,.brand{font-family:'Fraunces',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit; text-decoration:none;}
+  button, input{font-family:inherit; cursor:pointer;}
+
+  header{position:sticky; top:0; z-index:40; background:rgba(251,238,236,0.95); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+  .nav-row{display:flex; align-items:center; justify-content:space-between; padding:14px 18px;}
+  .brand{font-size:19px; font-weight:700; color:var(--plum); display:flex; align-items:center; gap:8px;}
+  .brand .dot{width:8px; height:8px; border-radius:50%; background:var(--rose);}
+  .tag-rider{font-size:11px; font-weight:700; color:#fff; background:var(--plum); padding:5px 10px; border-radius:100px;}
+
+  .wrap{max-width:640px; margin:0 auto; padding:0 18px;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; color:var(--plum); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;}
+  .field input{width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;}
+  .field input:focus{outline:none; border-color:var(--rose);}
+
+  .btn{width:100%; padding:15px; border-radius:100px; border:none; font-weight:700; font-size:15px; text-align:center;}
+  .btn-primary{background:var(--rose); color:#fff; box-shadow:0 6px 0 0 var(--rose-deep);}
+  .btn-primary:active{box-shadow:0 2px 0 0 var(--rose-deep); transform:translateY(4px);}
+  .btn-secondary{background:#fff; color:var(--plum); border:1.5px solid var(--line);}
+
+  .step-title{font-size:22px; font-weight:700; color:var(--plum); margin:20px 0 4px;}
+  .step-sub{font-size:13.5px; color:var(--ink-soft); margin-bottom:20px;}
+
+  .tabs{display:flex; gap:8px; margin:16px 0 20px; background:#fff; border:1px solid var(--line); border-radius:100px; padding:4px;}
+  .tab{flex:1; text-align:center; padding:10px; border-radius:100px; font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer;}
+  .tab.active{background:var(--plum); color:#fff;}
+
+  .order-card{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:12px;}
+  .order-card .top{display:flex; justify-content:space-between; align-items:flex-start;}
+  .order-card .oid{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);}
+  .order-card h4{font-size:14.5px; margin-top:2px;}
+  .status-pill{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:100px;}
+  .status-pill.assigned{background:rgba(198,87,122,0.12); color:var(--rose-deep);}
+  .status-pill.done{background:rgba(78,139,92,0.12); color:var(--green);}
+  .order-meta{font-size:12.5px; color:var(--ink-soft); margin:8px 0;}
+  .order-actions{display:flex; gap:8px; margin-top:10px;}
+  .order-actions button{flex:1; padding:10px; border-radius:10px; font-size:12.5px; font-weight:700; border:1.5px solid var(--line); background:#fff; color:var(--plum);}
+  .order-actions button.primary{background:var(--rose); color:#fff; border-color:var(--rose);}
+
+  .earn-card{background:var(--plum); color:#fff; border-radius:18px; padding:20px; margin-bottom:16px;}
+  .earn-card .label{font-size:12px; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.04em;}
+  .earn-card .amt{font-family:'Fraunces',serif; font-size:32px; font-weight:700; margin-top:4px;}
+  .earn-sub{display:flex; gap:10px; margin-top:14px;}
+  .earn-sub-chip{flex:1; background:rgba(255,255,255,0.1); border-radius:10px; padding:10px;}
+  .earn-sub-chip .n{font-size:15px; font-weight:700;}
+  .earn-sub-chip .l{font-size:10.5px; color:rgba(255,255,255,0.75);}
+
+  .note{font-size:12px; color:var(--ink-soft); background:rgba(107,80,88,0.06); border-radius:10px; padding:10px 12px; margin:12px 0;}
+  .empty{text-align:center; color:var(--ink-soft); padding:30px 20px; font-size:13.5px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav-row">
+    <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
+    <span class="tag-rider">Rider</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- AUTH -->
+<section class="screen active" id="screen-auth">
+  <div class="step-title">Rider log in</div>
+  <div class="step-sub">Use the email and password Sultini gave you when you were added.</div>
+  <div class="field"><label>Email</label><input type="email" id="rAuthEmail"></div>
+  <div class="field"><label>Password</label><input type="password" id="rAuthPassword"></div>
+  <button class="btn btn-primary" onclick="riderLogin()">Log in</button>
+  <div id="rAuthError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
+</section>
+
+<!-- DASHBOARD -->
+<section class="screen" id="screen-dashboard">
+  <div class="step-title" id="riderNameTitle" style="margin-top:16px;">Rider</div>
+  <div class="step-sub">Your deliveries</div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="deliveries" onclick="switchTab('deliveries')">Deliveries</div>
+    <div class="tab" data-tab="earnings" onclick="switchTab('earnings')">Earnings</div>
+  </div>
+
+  <div id="tab-deliveries">
+    <div class="note">Orders assigned to you by admin show here — update the status as you go.</div>
+    <div id="deliveryList"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div id="tab-earnings" style="display:none;">
+    <div class="earn-card">
+      <div class="label">Available to cash out</div>
+      <div class="amt" id="riderAvailable">₦0</div>
+      <div class="earn-sub">
+        <div class="earn-sub-chip"><div class="n" id="riderInWindow">₦0</div><div class="l">In dispute window</div></div>
+        <div class="earn-sub-chip"><div class="n" id="riderAllTime">₦0</div><div class="l">All-time earned</div></div>
+      </div>
+    </div>
+    <div class="note">Sultini reviews and pays cash-outs directly — contact admin when you're ready to cash out.</div>
+  </div>
+
+  <button class="btn btn-secondary" onclick="riderLogout()" style="margin-top:24px;">Log out</button>
+</section>
+
+</div>
+
+<script src="supabase-config.js"></script>
+<script>
+let currentRider = null;
+
+async function riderLogin(){
+  const email = document.getElementById('rAuthEmail').value.trim();
+  const password = document.getElementById('rAuthPassword').value;
+  const errEl = document.getElementById('rAuthError');
+  errEl.textContent = '';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = error.message; return; }
+  await afterRiderLogin();
+}
+
+async function afterRiderLogin(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session) return;
+  const { data: riders } = await supabaseClient.from('riders').select('*').eq('user_id', session.user.id).limit(1);
+  if(!riders || riders.length === 0){
+    document.getElementById('rAuthError').textContent = "This account isn't linked to a rider profile. Contact admin.";
+    return;
+  }
+  currentRider = riders[0];
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-dashboard').classList.add('active');
+  document.getElementById('riderNameTitle').textContent = currentRider.full_name;
+  await loadDeliveries();
+  await loadRiderEarnings();
+}
+
+async function riderLogout(){
+  await supabaseClient.auth.signOut();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-auth').classList.add('active');
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('tab-deliveries').style.display = tab==='deliveries' ? 'block':'none';
+  document.getElementById('tab-earnings').style.display = tab==='earnings' ? 'block':'none';
+}
+
+async function loadDeliveries(){
+  const { data: orders } = await supabaseClient
+    .from('orders').select('*, vendors(name, address)')
+    .eq('rider_id', currentRider.id)
+    .order('created_at', {ascending:false}).limit(30);
+  const el = document.getElementById('deliveryList');
+  if(!orders || orders.length === 0){ el.innerHTML = '<div class="empty">No deliveries assigned yet.</div>'; return; }
+
+  el.innerHTML = orders.map(o => {
+    const isDone = ['delivered','completed'].includes(o.status);
+    return `
+    <div class="order-card">
+      <div class="top">
+        <div><div class="oid">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4></div>
+        <span class="status-pill ${isDone?'done':'assigned'}">${o.status}</span>
+      </div>
+      <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}</div>
+      ${!isDone ? `<div class="order-actions">
+        ${o.status==='out_for_delivery' ? `<button class="primary" onclick="markPickedUp('${o.id}')">Picked up from store</button>` : ''}
+        ${o.status==='picked_up' ? `<button class="primary" onclick="markDelivered('${o.id}')">Mark delivered</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function markPickedUp(orderId){
+  await supabaseClient.from('orders').update({ status: 'picked_up' }).eq('id', orderId);
+  notifyCustomer(orderId, 'picked_up');
+  await loadDeliveries();
+}
+
+async function notifyCustomer(orderId, status){
+  try {
+    await fetch('/api/notify-customer', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ orderId, status })
+    });
+  } catch(e){ console.error('Customer notification failed', e); }
+}
+
+async function markDelivered(orderId){
+  await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+  notifyCustomer(orderId, 'delivered');
+  await loadDeliveries();
+  await loadRiderEarnings();
+}
+
+async function loadRiderEarnings(){
+  const { data: entries } = await supabaseClient
+    .from('ledger_entries').select('*').eq('rider_id', currentRider.id);
+  const list = entries || [];
+  const available = list.filter(e=>e.status==='available').reduce((s,e)=>s+Number(e.amount),0);
+  const inWindow = list.filter(e=>e.status==='in_dispute_window').reduce((s,e)=>s+Number(e.amount),0);
+  const allTime = list.reduce((s,e)=>s+Number(e.amount),0);
+  document.getElementById('riderAvailable').textContent = '₦'+available.toLocaleString();
+  document.getElementById('riderInWindow').textContent = '₦'+inWindow.toLocaleString();
+  document.getElementById('riderAllTime').textContent = '₦'+allTime.toLocaleString();
+}
+
+supabaseClient.auth.getSession().then(({data:{session}}) => {
+  if(session) afterRiderLogin();
+});
+</script>
+</body>
+</html>
