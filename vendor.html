@@ -476,6 +476,7 @@ async function submitRegistration(){
   const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'Local dishes';
   const { data: vendorRows, error: vErr } = await supabaseClient.from('vendors').insert([{
     owner_id: session.user.id,
+    email: session.user.email,
     name: document.getElementById('bizName').value.trim(),
     category,
     phone: document.getElementById('bizPhone').value.trim(),
