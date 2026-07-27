@@ -981,7 +981,9 @@ document.getElementById('backToBrowseBtn').addEventListener('click', ()=>{ showS
 loadPlatformSettings();
 loadStores();
 refreshAuthState();
-supabaseClient.auth.onAuthStateChange(() => refreshAuthState());
+supabaseClient.auth.onAuthStateChange((event) => {
+  if(event !== 'PASSWORD_RECOVERY') refreshAuthState();
+});
 
 // If we arrived here via a "Log in" / "Sign up" link from the homepage,
 // jump straight to the login screen instead of the store browse screen.
