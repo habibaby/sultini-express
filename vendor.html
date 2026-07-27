@@ -592,15 +592,24 @@ async function loadOrders(){
       </div>
       <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
       ${o.status==='new' ? `<div class="order-actions"><button onclick="updateOrderStatus('${o.id}','rejected')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
-      ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}')">Mark as ready</button></div>` : ''}
+      ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}','${o.fulfilment}')">Mark as ready</button></div>` : ''}
     </div>
   `).join('');
 }
-async function updateOrderStatus(orderId, status, pickupCode){
+async function updateOrderStatus(orderId, status, pickupCode, fulfilment){
   await supabaseClient.from('orders').update({ status }).eq('id', orderId);
   notifyCustomer(orderId, status);
   if(status === 'ready'){
     notifyAdmin('Order ready', `Order ${pickupCode || orderId} is marked ready.`);
+    if(fulfilment === 'delivery'){
+      try {
+        await fetch('/api/notify-riders-new-delivery', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ pickupCode })
+        });
+      } catch(e){ console.error('Rider notification failed', e); }
+    }
   }
   await loadOrders();
 }
