@@ -156,7 +156,22 @@
   <div class="field"><label>Password</label><input type="password" id="vAuthPassword"></div>
   <button class="btn btn-primary" onclick="vendorLogin()" style="margin-bottom:10px;">Log in</button>
   <button class="btn btn-secondary" onclick="vendorSignup()">Sign up instead</button>
+  <button type="button" onclick="showForgotPassword()" style="background:none; border:none; color:var(--ink-soft); font-size:12.5px; text-decoration:underline; margin-top:10px; display:block; width:100%; text-align:center;">Forgot password?</button>
   <div id="vAuthError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
+
+  <div id="forgotPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+    <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Enter your email and we'll send you a reset link.</div>
+    <div class="field"><input type="email" id="forgotEmail" placeholder="Email"></div>
+    <button class="btn btn-primary" onclick="sendPasswordReset()">Send reset link</button>
+    <div id="forgotPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+  </div>
+
+  <div id="resetPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+    <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Choose a new password.</div>
+    <div class="field"><input type="password" id="newPassword" placeholder="New password"></div>
+    <button class="btn btn-primary" onclick="submitNewPassword()">Set new password</button>
+    <div id="resetPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+  </div>
 </section>
 
 <!-- STEP 1: BUSINESS DETAILS -->
@@ -410,6 +425,42 @@ function renderDraftItems(){
     </div>
   `).join('');
 }
+
+function showForgotPassword(){
+  document.getElementById('forgotPasswordForm').style.display = 'block';
+}
+
+async function sendPasswordReset(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotPasswordMsg');
+  if(!email){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = 'Please enter your email.'; return; }
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/vendor.html'
+  });
+  if(error){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = error.message; return; }
+  msgEl.style.color = 'var(--green, #4E8B5C)';
+  msgEl.textContent = 'Check your email for a reset link.';
+}
+
+async function submitNewPassword(){
+  const newPassword = document.getElementById('newPassword').value;
+  const msgEl = document.getElementById('resetPasswordMsg');
+  if(!newPassword || newPassword.length < 6){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = 'Password must be at least 6 characters.'; return; }
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if(error){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = error.message; return; }
+  msgEl.style.color = 'var(--green, #4E8B5C)';
+  msgEl.textContent = 'Password updated! You can now use it to log in.';
+  document.getElementById('resetPasswordForm').style.display = 'none';
+}
+
+supabaseClient.auth.onAuthStateChange((event) => {
+  if(event === 'PASSWORD_RECOVERY'){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById('screen-auth').classList.add('active');
+    document.getElementById('forgotPasswordForm').style.display = 'none';
+    document.getElementById('resetPasswordForm').style.display = 'block';
+  }
+});
 
 async function vendorLogin(){
   const email = document.getElementById('vAuthEmail').value.trim();
