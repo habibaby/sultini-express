@@ -378,10 +378,15 @@
 <header>
   <div class="nav-row">
     <a href="#" class="brand"><span class="dot"></span>Sultini Express</a>
-    <div class="desktop-only nav-actions">
+    <div class="desktop-only nav-actions" id="navActionsLoggedOut">
       <a href="order.html" class="btn btn-ghost">Continue as guest</a>
       <a href="order.html?screen=account" class="btn btn-line">Log in</a>
       <a href="order.html?screen=account" class="btn btn-solid">Sign up</a>
+      <a href="vendor.html" class="btn btn-vendor">Become a vendor</a>
+    </div>
+    <div class="desktop-only nav-actions" id="navActionsLoggedIn" style="display:none;">
+      <a href="order.html" class="btn btn-ghost">Browse stores</a>
+      <a href="order.html?screen=account" class="btn btn-solid">My Account</a>
       <a href="vendor.html" class="btn btn-vendor">Become a vendor</a>
     </div>
     <button class="menu-toggle" onclick="document.getElementById('mmenu').classList.toggle('open')" aria-label="Menu">
@@ -390,8 +395,13 @@
   </div>
   <div class="mobile-menu" id="mmenu">
     <a href="vendor.html" class="btn btn-vendor">Become a vendor</a>
-    <a href="order.html?screen=account" class="btn btn-solid">Sign up</a>
-    <a href="order.html?screen=account" class="btn btn-line">Log in</a>
+    <div id="mmenuLoggedOut">
+      <a href="order.html?screen=account" class="btn btn-solid">Sign up</a>
+      <a href="order.html?screen=account" class="btn btn-line">Log in</a>
+    </div>
+    <div id="mmenuLoggedIn" style="display:none;">
+      <a href="order.html?screen=account" class="btn btn-solid">My Account</a>
+    </div>
     <a href="order.html" class="btn btn-ghost">Continue as guest</a>
   </div>
 </header>
@@ -534,6 +544,17 @@
 <script src="supabase-config.js"></script>
 <script>
 let allHomepageVendors = [];
+
+async function reflectLoginState(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const loggedIn = !!session;
+  document.getElementById('navActionsLoggedOut').style.display = loggedIn ? 'none' : 'flex';
+  document.getElementById('navActionsLoggedIn').style.display = loggedIn ? 'flex' : 'none';
+  document.getElementById('mmenuLoggedOut').style.display = loggedIn ? 'none' : 'block';
+  document.getElementById('mmenuLoggedIn').style.display = loggedIn ? 'block' : 'none';
+}
+reflectLoginState();
+supabaseClient.auth.onAuthStateChange(() => reflectLoginState());
 
 async function loadHomepageStores(){
   const { data: vendors } = await supabaseClient
