@@ -809,7 +809,9 @@ async function requestCashout(){
 }
 
 
-supabaseClient.auth.getSession().then(({data:{session}}) => { if(session) afterLogin(); });
+if(!window.location.hash.includes('type=recovery')){
+  supabaseClient.auth.getSession().then(({data:{session}}) => { if(session) afterLogin(); });
+}
 </script>
 </body>
 </html>
