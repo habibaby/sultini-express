@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: 'Sultini Express <onboarding@resend.dev>',
+        from: 'Sultini Express <notifications@sultini.com>',
         to: [order.customer_email],
         subject: `Sultini Express: ${template.subject}`,
         text: template.text(order.pickup_code),
