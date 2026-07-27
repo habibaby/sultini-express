@@ -148,7 +148,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
         body: JSON.stringify({
-          from: 'Sultini Express <onboarding@resend.dev>',
+          from: 'Sultini Express <notifications@sultini.com>',
           to: ['sultiniexpress@yahoo.com'],
           subject: `Sultini Express: New order ${pickupCode}`,
           text: `A new order (${pickupCode}) worth ₦${order.total} was just placed and paid for.`,
@@ -169,7 +169,7 @@ export default async function handler(req, res) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
           body: JSON.stringify({
-            from: 'Sultini Express <onboarding@resend.dev>',
+            from: 'Sultini Express <notifications@sultini.com>',
             to: [vendorEmail],
             subject: `New order: ${pickupCode}`,
             text: `You have a new order (${pickupCode}) worth ₦${order.total}. Log into your vendor dashboard to accept it.`,
