@@ -452,6 +452,7 @@ function filterAndRenderVendors(){
         </div>
         <div class="row-actions" style="margin-top:6px;">
           <button onclick="viewVendorDetail('${v.id}')">View / edit details</button>
+          <button onclick="messageVendorOnWhatsApp('${v.whatsapp||v.phone||''}','${v.name.replace(/'/g,"\\'")}','pending')">💬 WhatsApp</button>
           <button class="danger" onclick="deleteVendor('${v.id}','${v.name.replace(/'/g,"\\'")}')" style="border-color:rgba(184,76,76,0.4); color:var(--red);">🗑 Delete</button>
         </div>
       </div>`).join('') : '<div class="empty">None pending.</div>') +
@@ -461,6 +462,7 @@ function filterAndRenderVendors(){
         <div class="top" style="cursor:pointer;" onclick="viewVendorDetail('${v.id}')">${photoImg(v)}<div style="flex:1;"><h4>${v.name}</h4><div class="meta">${v.category} · ${v.rating||0}★</div></div><span class="pill approved">Live</span></div>
         <div class="row-actions" style="margin-top:6px;">
           <button onclick="viewVendorDetail('${v.id}')">View / edit details</button>
+          <button onclick="messageVendorOnWhatsApp('${v.whatsapp||v.phone||''}','${v.name.replace(/'/g,"\\'")}','live')">💬 WhatsApp</button>
           <button class="danger" onclick="deleteVendor('${v.id}','${v.name.replace(/'/g,"\\'")}')" style="border-color:rgba(184,76,76,0.4); color:var(--red);">🗑 Delete</button>
         </div>
       </div>
@@ -565,11 +567,36 @@ async function saveVendorDetail(){
   await loadVendors();
 }
 
+// Turns a locally-formatted Nigerian number (e.g. "0803 123 4567") into
+// the international format WhatsApp links need, and opens a chat with
+// the delivery details already typed in — no API, no approval process,
+// just the phone numbers you already collect.
+function whatsappRiderLink(phone, message){
+  const digits = (phone || '').replace(/\D/g, '');
+  const intl = digits.startsWith('234') ? digits : '234' + digits.replace(/^0/, '');
+  return `https://wa.me/${intl}?text=${encodeURIComponent(message)}`;
+}
+function messageRiderOnWhatsApp(phone, pickupCode, storeName, address){
+  const msg = `Hi! You've been assigned a Sultini delivery.\nOrder: ${pickupCode}\nPickup from: ${storeName}\nDeliver to: ${address || 'address on the order'}\n\nPlease confirm you've got this one.`;
+  window.open(whatsappRiderLink(phone, msg), '_blank');
+}
+
+function messageVendorOnWhatsApp(phone, vendorName, context){
+  const msg = context === 'pending'
+    ? `Hi ${vendorName}! This is Sultini Express. Your store application is in review — we'll be in touch shortly.`
+    : `Hi ${vendorName}! This is Sultini Express, just checking in on your store.`;
+  window.open(whatsappRiderLink(phone, msg), '_blank');
+}
+function messageVendorAboutOrder(phone, vendorName, pickupCode, total){
+  const msg = `Hi ${vendorName}! Following up on order ${pickupCode} (₦${Number(total).toLocaleString()}) on Sultini Express.`;
+  window.open(whatsappRiderLink(phone, msg), '_blank');
+}
+
 // ---- Orders ----
 async function loadOrders(){
-  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name), riders(full_name)').order('created_at',{ascending:false}).limit(60);
+  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name, whatsapp, phone), riders(full_name, phone)').order('created_at',{ascending:false}).limit(60);
   allOrdersData = orders || [];
-  const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name, dedicated_vendor_id').eq('active', true);
+  const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name, phone, dedicated_vendor_id').eq('active', true);
   allActiveRidersForOrders = activeRiders || [];
   filterAndRenderOrders();
 }
@@ -588,7 +615,10 @@ function filterAndRenderOrders(){
     let riderSection = '';
     if(o.fulfilment === 'delivery'){
       if(o.rider_id){
-        riderSection = `<div class="meta" style="margin-top:6px;">🛵 Rider: ${o.riders?.full_name || 'Assigned'}</div>`;
+        riderSection = `<div class="meta" style="margin-top:6px;">🛵 Rider: ${o.riders?.full_name || 'Assigned'}</div>
+          <div class="row-actions" style="margin-top:4px;">
+            <button onclick="messageRiderOnWhatsApp('${o.riders?.phone || ''}','${o.pickup_code}','${(o.vendors?.name||'').replace(/'/g,"\\'")}','${(o.delivery_address||'').replace(/'/g,"\\'")}')">💬 Message on WhatsApp</button>
+          </div>`;
         if(!['delivered','completed'].includes(o.status)){
           riderSection += `<div class="row-actions"><button class="primary" onclick="markDelivered('${o.id}','${o.vendor_id}','${o.delivery_fee}')">Mark delivered</button></div>`;
         }
@@ -622,6 +652,9 @@ function filterAndRenderOrders(){
         <div><div class="id">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4><div class="meta">${o.fulfilment} · ${o.status}</div></div>
         <span class="pill ${o.status==='delivered'||o.status==='picked_up'||o.status==='completed'?'approved':'done'}">${o.status}</span>
       </div>
+      <div class="row-actions" style="margin-top:6px;">
+        <button onclick="messageVendorAboutOrder('${o.vendors?.whatsapp||o.vendors?.phone||''}','${(o.vendors?.name||'').replace(/'/g,"\\'")}','${o.pickup_code}','${o.total}')">💬 Message vendor</button>
+      </div>
       ${riderSection}
       ${refundSection}
     </div>`;
@@ -649,8 +682,13 @@ async function assignRider(orderId){
   const select = document.getElementById('riderSelect-'+orderId);
   const riderId = select.value;
   if(!riderId){ alert('Choose a rider first.'); return; }
+  const order = allOrdersData.find(o => o.id === orderId);
+  const rider = allActiveRidersForOrders.find(r => r.id === riderId);
   await supabaseClient.from('orders').update({ rider_id: riderId, status: 'out_for_delivery' }).eq('id', orderId);
   notifyCustomer(orderId, 'out_for_delivery');
+  if(rider?.phone && order){
+    messageRiderOnWhatsApp(rider.phone, order.pickup_code, order.vendors?.name, order.delivery_address);
+  }
   await loadOrders();
 }
 
