@@ -4,15 +4,23 @@
 // reverses the vendor's ledger entry so they don't still get paid
 // for an order that was refunded. Runs server-side since it needs
 // the Paystack secret key.
+//
+// A reason is REQUIRED and gets written onto the vendor's ledger entry.
+// No deduction should ever be a mystery to the vendor who earned it —
+// this is what the vendor payout history reads from to explain why an
+// amount changed.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { orderId } = req.body;
+  const { orderId, reason } = req.body;
   if (!orderId) {
     return res.status(400).json({ error: 'Missing orderId' });
+  }
+  if (!reason || !reason.trim()) {
+    return res.status(400).json({ error: 'A reason is required before a refund can be issued' });
   }
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -53,11 +61,12 @@ export default async function handler(req, res) {
     });
 
     // 4. Reverse the vendor's ledger entry for this order so they
-    //    don't get paid for a refunded order (only if not already paid out)
+    //    don't get paid for a refunded order (only if not already paid out) —
+    //    and record WHY, visible on the vendor's own payout history.
     await fetch(`${SUPABASE_URL}/rest/v1/ledger_entries?order_id=eq.${orderId}&status=neq.paid`, {
       method: 'PATCH',
       headers: { ...sbHeaders, Prefer: 'return=minimal' },
-      body: JSON.stringify({ status: 'reversed' }),
+      body: JSON.stringify({ status: 'reversed', adjustment_reason: reason.trim() }),
     });
 
     return res.status(200).json({ success: true });
