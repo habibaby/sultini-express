@@ -248,19 +248,15 @@
   <div class="step-sub">Where your earnings are sent when you cash out.</div>
 
   <div class="field">
-    <label>Bank name</label>
-    <input type="text" placeholder="e.g. Access Bank" id="bankName">
+    <label>Bank</label>
+    <select id="bankCode"><option value="">Loading banks…</option></select>
   </div>
-  <div class="field-row">
-    <div class="field">
-      <label>Account number</label>
-      <input type="text" placeholder="0123456789" id="acctNumber">
-    </div>
-    <div class="field">
-      <label>Account name</label>
-      <input type="text" placeholder="Must match store owner" id="acctName">
-    </div>
+  <div class="field">
+    <label>Account number</label>
+    <input type="text" placeholder="0123456789" id="acctNumber" maxlength="10" oninput="resetVerification()">
   </div>
+  <button type="button" class="btn" id="verifyBtn" onclick="verifyVendorAccount()" style="margin-top:8px;">Verify account</button>
+  <div id="verifyResult" style="margin-top:10px; font-size:13px;"></div>
 
   <div class="split-box">
     <h3>How you get paid</h3>
@@ -268,7 +264,7 @@
       <div class="split-chip"><div class="pct">80%</div><div class="who">goes to you</div></div>
       <div class="split-chip"><div class="pct">20%</div><div class="who">platform fee</div></div>
     </div>
-    <p>Every payment goes through Sultini's Paystack account. Your 80% builds up in your Sultini balance. If there's no dispute within 1 day of an order, you can request a cash-out the next day — Sultini reviews and pays it to the account above.</p>
+    <p>Every payment goes through Sultini's Paystack account. Your 80% builds up in your Sultini balance. If there's no dispute within 1 day of an order, you can request a cash-out the next day — Sultini reviews and pays it to the verified account above.</p>
   </div>
 
   <label class="agree-row">
@@ -471,6 +467,63 @@ async function vendorLogin(){
   if(error){ err.textContent = error.message; return; }
   await afterLogin();
 }
+// ---- Bank verification (payout step) ----
+let vendorAccountVerified = false;
+let verifiedAccountName = '';
+
+async function loadBankList(){
+  const select = document.getElementById('bankCode');
+  try {
+    const resp = await fetch('/api/list-banks');
+    const result = await resp.json();
+    if(!resp.ok) throw new Error(result.error);
+    select.innerHTML = '<option value="">Select your bank</option>' +
+      result.banks.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+  } catch(e){
+    select.innerHTML = '<option value="">Could not load banks — check your connection and reopen this page</option>';
+  }
+}
+
+function resetVerification(){
+  vendorAccountVerified = false;
+  verifiedAccountName = '';
+  document.getElementById('verifyResult').textContent = '';
+  toggleSubmit();
+}
+
+async function verifyVendorAccount(){
+  const bankCode = document.getElementById('bankCode').value;
+  const acctNumber = document.getElementById('acctNumber').value.trim();
+  const resultEl = document.getElementById('verifyResult');
+
+  if(!bankCode){ resultEl.innerHTML = '<span style="color:var(--red);">Choose a bank first.</span>'; return; }
+  if(acctNumber.length !== 10){ resultEl.innerHTML = '<span style="color:var(--red);">Account number should be 10 digits.</span>'; return; }
+
+  resultEl.textContent = 'Checking…';
+  try {
+    const resp = await fetch('/api/verify-bank-account', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ accountNumber: acctNumber, bankCode })
+    });
+    const result = await resp.json();
+    if(!resp.ok){
+      vendorAccountVerified = false;
+      resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`;
+      toggleSubmit();
+      return;
+    }
+    vendorAccountVerified = true;
+    verifiedAccountName = result.accountName;
+    resultEl.innerHTML = `✅ <strong>${result.accountName}</strong> — is this you? If not, double-check the account number.`;
+    toggleSubmit();
+  } catch(e){
+    vendorAccountVerified = false;
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not verify right now — try again.</span>';
+    toggleSubmit();
+  }
+}
+
 async function vendorSignup(){
   const email = document.getElementById('vAuthEmail').value.trim();
   const password = document.getElementById('vAuthPassword').value;
@@ -512,6 +565,7 @@ async function afterLogin(){
 // ---- Registration submit (real) ----
 async function submitRegistration(){
   if(document.getElementById('submitBtn').classList.contains('disabled')) return;
+  if(!vendorAccountVerified){ alert('Please verify your bank account before submitting.'); return; }
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(!session){ alert('Please log in first.'); return; }
 
@@ -524,6 +578,10 @@ async function submitRegistration(){
     cover_image_url = urlData.publicUrl;
   }
 
+  const bankCode = document.getElementById('bankCode').value;
+  const acctNumber = document.getElementById('acctNumber').value.trim();
+  const bankName = document.getElementById('bankCode').selectedOptions[0]?.textContent || '';
+
   const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'Local dishes';
   const { data: vendorRows, error: vErr } = await supabaseClient.from('vendors').insert([{
     owner_id: session.user.id,
@@ -533,9 +591,9 @@ async function submitRegistration(){
     phone: document.getElementById('bizPhone').value.trim(),
     whatsapp: document.getElementById('bizWhatsapp').value.trim(),
     address: document.getElementById('bizAddress').value.trim(),
-    bank_name: document.getElementById('bankName').value.trim(),
-    account_number: document.getElementById('acctNumber').value.trim(),
-    account_name: document.getElementById('acctName').value.trim(),
+    bank_name: bankName,
+    account_number: acctNumber,
+    account_name: verifiedAccountName,
     cover_image_url,
     avg_delivery_minutes: Number(document.getElementById('bizDeliveryMinutes').value) || 25,
     status: 'pending'
@@ -544,6 +602,23 @@ async function submitRegistration(){
   if(vErr){ alert('Could not submit: ' + vErr.message); return; }
   const vendor = vendorRows[0];
   currentVendor = vendor;
+
+  // Create the real Paystack transfer recipient now that we have a vendor id.
+  // This re-verifies server-side too, so this is never trusting the browser alone.
+  try {
+    const recipientResp = await fetch('/api/create-transfer-recipient', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ recipientType: 'vendor', id: vendor.id, accountNumber: acctNumber, bankCode })
+    });
+    if(!recipientResp.ok){
+      const r = await recipientResp.json();
+      console.error('Recipient creation failed:', r.error);
+      // Don't block the application over this — admin can see "no verified
+      // payout account" on the payouts screen and the vendor can be asked
+      // to re-verify. The store application itself still succeeded.
+    }
+  } catch(e){ console.error('Recipient creation failed', e); }
 
   const validItems = draftItems.filter(i => i.name && i.price);
   if(validItems.length > 0){
@@ -578,6 +653,7 @@ function goStep(n){
   document.getElementById('backBtn').style.visibility = n>1 ? 'visible':'hidden';
   window.scrollTo(0,0);
   if(n===2 && draftItems.length===0) addDraftItem();
+  if(n===3) loadBankList();
 }
 
 document.querySelectorAll('.cat-select').forEach(btn=>{
@@ -588,7 +664,8 @@ document.querySelectorAll('.cat-select').forEach(btn=>{
 });
 
 function toggleSubmit(){
-  document.getElementById('submitBtn').classList.toggle('disabled', !document.getElementById('agreeCheck').checked);
+  const ready = document.getElementById('agreeCheck').checked && vendorAccountVerified;
+  document.getElementById('submitBtn').classList.toggle('disabled', !ready);
 }
 
 // ---- Dashboard (real data) ----
@@ -784,17 +861,33 @@ async function loadEarnings(){
 
   const historyEl = document.getElementById('payoutHistoryList');
   const history = list
-    .filter(e => ['paid','cashout_requested','held'].includes(e.status))
+    .filter(e => ['paid','cashout_requested','held','processing','transfer_failed','reversed'].includes(e.status))
     .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 10);
   if(history.length === 0){
     historyEl.innerHTML = '<div class="note">No payout history yet.</div>';
   } else {
+    const labels = {
+      paid: ['Paid', 'paid'],
+      held: ['On hold', 'pending'],
+      cashout_requested: ['Requested', 'pending'],
+      processing: ['Processing', 'pending'],
+      transfer_failed: ['Payout failed — will retry', 'pending'],
+      reversed: ['Reversed', 'pending'],
+    };
     historyEl.innerHTML = history.map(e => {
-      const date = new Date(e.paid_at || e.created_at).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
-      const statusLabel = e.status==='paid' ? 'Paid' : (e.status==='held' ? 'On hold' : 'Requested');
-      const statusClass = e.status==='paid' ? 'paid' : 'pending';
-      return `<div class="payout-row"><span>${date} · Cash-out</span><span class="amt">₦${Number(e.amount).toLocaleString()}</span><span class="payout-status ${statusClass}">${statusLabel}</span></div>`;
+      const date = new Date(e.paid_at || e.transfer_attempted_at || e.created_at).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+      const [statusLabel, statusClass] = labels[e.status] || [e.status, 'pending'];
+      // Every reversal or hold shows WHY — never just a number that changed
+      const reasonLine = e.adjustment_reason
+        ? `<div class="note" style="margin-top:2px;">${e.adjustment_reason}</div>`
+        : '';
+      return `<div class="payout-row" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>${date} · Cash-out</span><span class="amt">₦${Number(e.amount).toLocaleString()}</span><span class="payout-status ${statusClass}">${statusLabel}</span>
+        </div>
+        ${reasonLine}
+      </div>`;
     }).join('');
   }
 }
