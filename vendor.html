@@ -719,11 +719,40 @@ async function loadOrders(){
         <span class="status-pill ${o.status==='ready'?'ready':(o.status==='preparing'?'preparing':'new')}">${o.status}</span>
       </div>
       <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
-      ${o.status==='new' ? `<div class="order-actions"><button onclick="updateOrderStatus('${o.id}','rejected')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
+      ${o.status==='new' ? `<div class="order-actions"><button onclick="rejectOrder('${o.id}','${o.payment_method}')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
       ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}','${o.fulfilment}')">Mark as ready</button></div>` : ''}
     </div>
   `).join('');
 }
+// Rejecting an order that was paid online must ALWAYS trigger a real refund —
+// a rejected order is, by definition, one the customer never received.
+// Cash-on-delivery orders need no refund since no money was ever taken.
+async function rejectOrder(orderId, paymentMethod){
+  if(!confirm('Reject this order? If it was paid online, the customer will be refunded automatically.')) return;
+
+  await supabaseClient.from('orders').update({ status: 'rejected' }).eq('id', orderId);
+  notifyCustomer(orderId, 'rejected');
+
+  if(paymentMethod === 'online'){
+    try {
+      const resp = await fetch('/api/refund-order', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ orderId, reason: 'Order rejected by vendor — refunded automatically, no charge applies.' })
+      });
+      if(!resp.ok){
+        const result = await resp.json();
+        // Don't hide this — a failed automatic refund needs a human to catch it
+        alert('Order rejected, but the automatic refund failed: ' + result.error + '\nPlease tell Sultini support so the customer can be refunded manually.');
+      }
+    } catch(e){
+      alert('Order rejected, but the automatic refund could not be confirmed. Please tell Sultini support to check this order.');
+    }
+  }
+
+  await loadOrders();
+}
+
 async function updateOrderStatus(orderId, status, pickupCode, fulfilment){
   await supabaseClient.from('orders').update({ status }).eq('id', orderId);
   notifyCustomer(orderId, status);
