@@ -950,6 +950,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
     email: guestEmail,
     amount: Math.round(total * 100), // Paystack uses kobo
     currency: 'NGN',
+    channels: ['card', 'ussd', 'bank_transfer', 'mobile_money'], // USSD added as a fallback for cards that get declined
     onSuccess: async (transaction) => {
       placeBtn.textContent = 'Confirming order…';
       try {
