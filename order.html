@@ -558,10 +558,11 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
 });
 
 async function loadStores(){
+  // Uses the public-safe view — never the raw vendors table — so bank
+  // details and recipient codes are never sent to the browser here.
   const { data: vendors, error } = await supabaseClient
-    .from('vendors')
-    .select('*, menu_items(*)')
-    .eq('status', 'approved');
+    .from('public_vendor_listings')
+    .select('*');
 
   if (error) {
     document.getElementById('storeList').innerHTML =
@@ -575,18 +576,31 @@ async function loadStores(){
     return;
   }
 
-  STORES = vendors.map(v => ({
-    id: v.id,
-    name: v.name,
-    category: v.category,
-    img: v.cover_image_url || v.menu_items?.[0]?.photo_url || '',
-    rating: v.rating || 0,
-    time: (v.avg_delivery_minutes || 25) + ' min',
-    menu: (v.menu_items || []).map(m => ({
-      id: m.id, name: m.name, desc: m.description, price: Number(m.price),
-      img: m.photo_url, inStock: m.in_stock
-    }))
-  }));
+  const vendorIds = vendors.map(v => v.id);
+  const { data: menuItems } = await supabaseClient
+    .from('menu_items')
+    .select('*')
+    .in('vendor_id', vendorIds);
+  const menuByVendor = {};
+  (menuItems || []).forEach(m => {
+    (menuByVendor[m.vendor_id] ||= []).push(m);
+  });
+
+  STORES = vendors.map(v => {
+    const items = menuByVendor[v.id] || [];
+    return {
+      id: v.id,
+      name: v.name,
+      category: v.category,
+      img: v.cover_image_url || items[0]?.photo_url || '',
+      rating: v.rating || 0,
+      time: (v.avg_delivery_minutes || 25) + ' min',
+      menu: items.map(m => ({
+        id: m.id, name: m.name, desc: m.description, price: Number(m.price),
+        img: m.photo_url, inStock: m.in_stock
+      }))
+    };
+  });
   renderStores();
 
   // If we arrived here from a homepage store card, jump straight to that store's menu
