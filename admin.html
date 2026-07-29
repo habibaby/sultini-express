@@ -203,6 +203,11 @@
   </div>
   <button type="button" class="btn" id="riderVerifyBtn" onclick="verifyRiderAccount()" style="margin-bottom:10px;">Verify account</button>
   <div id="riderVerifyResult" style="margin-bottom:10px; font-size:13px;"></div>
+  <div class="field">
+    <label>Dedicate to a vendor (optional)</label>
+    <select id="riderDedicatedVendor"><option value="">General pool — available for any store's deliveries</option></select>
+    <div class="meta" style="margin-top:4px;">If this is a vendor's own delivery person on their own bike, dedicate them here — they'll keep 100% of the delivery fee on that vendor's orders instead of the usual split.</div>
+  </div>
   <div class="field-row">
     <div class="field">
       <label>Login email</label>
@@ -358,6 +363,7 @@ async function loadEverything(){
   await loadPayouts();
   await loadRiders();
   await loadRiderBankList();
+  await loadVendorsForDedication();
   await loadDisputes();
   await loadOverview();
 }
@@ -563,7 +569,7 @@ async function saveVendorDetail(){
 async function loadOrders(){
   const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name), riders(full_name)').order('created_at',{ascending:false}).limit(60);
   allOrdersData = orders || [];
-  const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name').eq('active', true);
+  const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name, dedicated_vendor_id').eq('active', true);
   allActiveRidersForOrders = activeRiders || [];
   filterAndRenderOrders();
 }
@@ -578,8 +584,6 @@ function filterAndRenderOrders(){
   const el = document.getElementById('ordersContainer');
   if(!orders || orders.length===0){ el.innerHTML = '<div class="empty">No orders match.</div>'; return; }
 
-  const riderOptions = allActiveRidersForOrders.map(r => `<option value="${r.id}">${r.full_name}</option>`).join('');
-
   el.innerHTML = orders.map(o => {
     let riderSection = '';
     if(o.fulfilment === 'delivery'){
@@ -589,11 +593,18 @@ function filterAndRenderOrders(){
           riderSection += `<div class="row-actions"><button class="primary" onclick="markDelivered('${o.id}','${o.vendor_id}','${o.delivery_fee}')">Mark delivered</button></div>`;
         }
       } else {
+        // This store's own dedicated rider (if any) goes first and gets
+        // pre-selected — everyone else stays available underneath.
+        const dedicatedForThisVendor = allActiveRidersForOrders.filter(r => r.dedicated_vendor_id === o.vendor_id);
+        const generalPool = allActiveRidersForOrders.filter(r => r.dedicated_vendor_id !== o.vendor_id);
+        const options =
+          dedicatedForThisVendor.map(r => `<option value="${r.id}" selected>⭐ ${r.full_name} — this store's own rider (keeps 100% of delivery fee)</option>`).join('') +
+          generalPool.map(r => `<option value="${r.id}">${r.full_name}${r.dedicated_vendor_id ? ' (dedicated elsewhere)' : ''}</option>`).join('');
         riderSection = `
           <div class="row-actions">
             <select id="riderSelect-${o.id}" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line);">
-              <option value="">Assign a rider…</option>
-              ${riderOptions}
+              ${dedicatedForThisVendor.length === 0 ? '<option value="">Assign a rider…</option>' : ''}
+              ${options}
             </select>
             <button class="primary" onclick="assignRider('${o.id}')">Assign</button>
           </div>`;
@@ -815,9 +826,17 @@ async function verifyRiderAccount(){
   }
 }
 
+async function loadVendorsForDedication(){
+  const select = document.getElementById('riderDedicatedVendor');
+  if(!select) return;
+  const { data: vendors } = await supabaseClient.from('vendors').select('id,name').eq('status','approved').order('name');
+  select.innerHTML = '<option value="">General pool — available for any store\'s deliveries</option>' +
+    (vendors || []).map(v => `<option value="${v.id}">${v.name} (dedicated)</option>`).join('');
+}
+
 // ---- Riders ----
 async function loadRiders(){
-  const { data: riders } = await supabaseClient.from('riders').select('*').order('created_at',{ascending:false});
+  const { data: riders } = await supabaseClient.from('riders').select('*, vendors(name)').order('created_at',{ascending:false});
   allRidersData = riders || [];
   filterAndRenderRiders();
 }
@@ -826,11 +845,16 @@ function filterAndRenderRiders(){
   const riders = q ? allRidersData.filter(r => r.full_name.toLowerCase().includes(q) || (r.phone||'').includes(q)) : allRidersData;
   const el = document.getElementById('riderList');
   if(!riders || riders.length===0){ el.innerHTML = '<div class="empty">No riders match.</div>'; return; }
-  el.innerHTML = riders.map(r=>`
+  el.innerHTML = riders.map(r=>{
+    const dedicatedTag = r.dedicated_vendor_id
+      ? `<span class="pill approved" style="margin-left:6px;">⭐ Dedicated: ${r.vendors?.name || 'a vendor'}</span>`
+      : '';
+    return `
     <div class="rider-row">
       <div><div class="n">${r.full_name}</div><div class="m">${r.vehicle||'—'} · ${r.phone}${r.account_verified ? '' : ' · ⚠️ no verified payout account'}</div></div>
-      <span class="pill ${r.active?'approved':'flag'}">${r.active?'Active':'Inactive'}</span>
-    </div>`).join('');
+      <div>${dedicatedTag}<span class="pill ${r.active?'approved':'flag'}" style="margin-left:6px;">${r.active?'Active':'Inactive'}</span></div>
+    </div>`;
+  }).join('');
 }
 async function addRider(){
   const full_name = document.getElementById('riderName').value.trim();
@@ -841,6 +865,7 @@ async function addRider(){
   const account_number = document.getElementById('riderAcct').value.trim();
   const email = document.getElementById('riderEmail').value.trim();
   const password = document.getElementById('riderPassword').value;
+  const dedicated_vendor_id = document.getElementById('riderDedicatedVendor').value || null;
   const errEl = document.getElementById('riderAddError');
   errEl.textContent = '';
   if(!full_name || !phone || !email || !password){
@@ -855,7 +880,7 @@ async function addRider(){
   const resp = await fetch('/api/create-rider-account', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ email, password, full_name, phone, vehicle, bank_name, account_number, added_by: session.user.id })
+    body: JSON.stringify({ email, password, full_name, phone, vehicle, bank_name, account_number, added_by: session.user.id, dedicated_vendor_id })
   });
   const result = await resp.json();
   if(!resp.ok){ errEl.textContent = result.error || 'Could not create rider account.'; return; }
@@ -875,6 +900,7 @@ async function addRider(){
   document.getElementById('riderAcct').value='';
   document.getElementById('riderEmail').value='';
   document.getElementById('riderPassword').value='';
+  document.getElementById('riderDedicatedVendor').value='';
   resetRiderVerification();
   await loadRiders();
 }
