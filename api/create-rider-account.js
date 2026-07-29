@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, password, full_name, phone, vehicle, bank_name, account_number, added_by } = req.body;
+  const { email, password, full_name, phone, vehicle, bank_name, account_number, added_by, dedicated_vendor_id } = req.body;
   if (!email || !password || !full_name || !phone) {
     return res.status(400).json({ error: 'Missing required rider details' });
   }
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
         full_name, phone, vehicle: vehicle || null, email, active: true,
         bank_name: bank_name || null, account_number: account_number || null,
         user_id: userId, added_by: added_by || null,
+        dedicated_vendor_id: dedicated_vendor_id || null,
       }]),
     });
     const riderData = await riderRes.json();
