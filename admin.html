@@ -193,14 +193,16 @@
   </div>
   <div class="field-row">
     <div class="field">
-      <label>Bank name</label>
-      <input type="text" placeholder="e.g. GTBank" id="riderBank">
+      <label>Bank</label>
+      <select id="riderBankCode"><option value="">Loading banks…</option></select>
     </div>
     <div class="field">
       <label>Account number</label>
-      <input type="text" placeholder="0123456789" id="riderAcct">
+      <input type="text" placeholder="0123456789" id="riderAcct" maxlength="10" oninput="resetRiderVerification()">
     </div>
   </div>
+  <button type="button" class="btn" id="riderVerifyBtn" onclick="verifyRiderAccount()" style="margin-bottom:10px;">Verify account</button>
+  <div id="riderVerifyResult" style="margin-bottom:10px; font-size:13px;"></div>
   <div class="field-row">
     <div class="field">
       <label>Login email</label>
@@ -355,6 +357,7 @@ async function loadEverything(){
   await loadOrders();
   await loadPayouts();
   await loadRiders();
+  await loadRiderBankList();
   await loadDisputes();
   await loadOverview();
 }
@@ -615,11 +618,14 @@ function filterAndRenderOrders(){
 }
 
 async function refundOrder(orderId, pickupCode){
+  const reason = prompt(`Refund order ${pickupCode} — why? (This is shown to the vendor, so it must be specific — e.g. "Missing item reported by customer, confirmed with rider.")`);
+  if(reason === null) return; // cancelled
+  if(!reason.trim()){ alert('A reason is required — the vendor needs to see why this was deducted.'); return; }
   if(!confirm(`Refund order ${pickupCode}? This sends real money back to the customer and cannot be undone.`)) return;
   const resp = await fetch('/api/refund-order', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ orderId })
+    body: JSON.stringify({ orderId, reason })
   });
   const result = await resp.json();
   if(!resp.ok){ alert('Refund failed: ' + result.error); return; }
@@ -660,11 +666,11 @@ async function markDelivered(orderId, vendorId, deliveryFee){
 // ---- Payouts ----
 async function loadPayouts(){
   const { data: entries } = await supabaseClient
-    .from('ledger_entries').select('*, vendors(name), riders(full_name)')
-    .in('status', ['available','cashout_requested','in_dispute_window','held'])
+    .from('ledger_entries').select('*, vendors(name, account_verified), riders(full_name, account_verified)')
+    .in('status', ['available','cashout_requested','in_dispute_window','held','processing','transfer_failed'])
     .order('created_at', {ascending:false}).limit(30);
 
-  const actionable = (entries||[]).filter(e => e.status==='available' || e.status==='cashout_requested').length;
+  const actionable = (entries||[]).filter(e => e.status==='available' || e.status==='cashout_requested' || e.status==='transfer_failed').length;
   const payoutsBadge = document.getElementById('payoutsNavBadge');
   if(actionable > 0){ payoutsBadge.dataset.n = actionable; payoutsBadge.classList.add('badge-dot'); }
   else { payoutsBadge.classList.remove('badge-dot'); }
@@ -673,6 +679,8 @@ async function loadPayouts(){
   if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No pending cash-outs.</div>'; return; }
   el.innerHTML = entries.map(e => {
     const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    const verified = e.recipient_type==='vendor' ? e.vendors?.account_verified : e.riders?.account_verified;
+
     if(e.status==='held'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ Held — customer dispute open</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
       <div class="row-actions"><button onclick="go('disputes')">Review dispute</button><button class="primary" onclick="setLedgerStatus('${e.id}','available')">Release hold</button></div></div>`;
@@ -680,14 +688,37 @@ async function loadPayouts(){
     if(e.status==='in_dispute_window'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Still in dispute window</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
     }
+    if(e.status==='processing'){
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⏳ Sent to Paystack, awaiting confirmation</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
+    }
+    if(e.status==='transfer_failed'){
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ❌ Transfer failed: ${e.failure_reason||'unknown reason'}</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="row-actions"><button class="primary" onclick="payOut('${e.id}')">Retry payout</button></div></div>`;
+    }
+    if(!verified){
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ No verified payout account — cannot pay out yet</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
+    }
     return `<div class="card">
       <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Dispute window clear</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div>
       <div class="row-actions">
         <button class="danger" onclick="setLedgerStatus('${e.id}','held')">Hold</button>
-        <button class="primary" onclick="setLedgerStatus('${e.id}','paid')">Approve payout</button>
+        <button class="primary" onclick="payOut('${e.id}')">Pay out via Paystack</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function payOut(ledgerEntryId){
+  if(!confirm('Send this payout via Paystack now? This moves real money.')) return;
+  const resp = await fetch('/api/pay-out', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ ledgerEntryId })
+  });
+  const result = await resp.json();
+  if(!resp.ok){ alert('Payout failed: ' + result.error); await loadPayouts(); return; }
+  alert('Transfer sent — status will update to "paid" once Paystack confirms it.');
+  await loadPayouts();
 }
 
 // ---- Disputes ----
@@ -732,6 +763,58 @@ async function setLedgerStatus(id, status){
   await loadPayouts();
 }
 
+// ---- Rider bank verification ----
+let riderAccountVerified = false;
+let riderVerifiedAccountName = '';
+
+async function loadRiderBankList(){
+  const select = document.getElementById('riderBankCode');
+  if(!select) return;
+  try {
+    const resp = await fetch('/api/list-banks');
+    const result = await resp.json();
+    if(!resp.ok) throw new Error(result.error);
+    select.innerHTML = '<option value="">Select bank</option>' +
+      result.banks.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+  } catch(e){
+    select.innerHTML = '<option value="">Could not load banks</option>';
+  }
+}
+
+function resetRiderVerification(){
+  riderAccountVerified = false;
+  riderVerifiedAccountName = '';
+  document.getElementById('riderVerifyResult').textContent = '';
+}
+
+async function verifyRiderAccount(){
+  const bankCode = document.getElementById('riderBankCode').value;
+  const acctNumber = document.getElementById('riderAcct').value.trim();
+  const resultEl = document.getElementById('riderVerifyResult');
+  if(!bankCode){ resultEl.innerHTML = '<span style="color:var(--red);">Choose a bank first.</span>'; return; }
+  if(acctNumber.length !== 10){ resultEl.innerHTML = '<span style="color:var(--red);">Account number should be 10 digits.</span>'; return; }
+  resultEl.textContent = 'Checking…';
+  try {
+    const resp = await fetch('/api/verify-bank-account', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ accountNumber: acctNumber, bankCode })
+    });
+    const result = await resp.json();
+    if(!resp.ok){
+      riderAccountVerified = false;
+      resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`;
+      return;
+    }
+    riderAccountVerified = true;
+    riderVerifiedAccountName = result.accountName;
+    resultEl.innerHTML = `✅ <strong>${result.accountName}</strong>`;
+  } catch(e){
+    riderAccountVerified = false;
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not verify right now — try again.</span>';
+  }
+}
+
 // ---- Riders ----
 async function loadRiders(){
   const { data: riders } = await supabaseClient.from('riders').select('*').order('created_at',{ascending:false});
@@ -745,7 +828,7 @@ function filterAndRenderRiders(){
   if(!riders || riders.length===0){ el.innerHTML = '<div class="empty">No riders match.</div>'; return; }
   el.innerHTML = riders.map(r=>`
     <div class="rider-row">
-      <div><div class="n">${r.full_name}</div><div class="m">${r.vehicle||'—'} · ${r.phone}</div></div>
+      <div><div class="n">${r.full_name}</div><div class="m">${r.vehicle||'—'} · ${r.phone}${r.account_verified ? '' : ' · ⚠️ no verified payout account'}</div></div>
       <span class="pill ${r.active?'approved':'flag'}">${r.active?'Active':'Inactive'}</span>
     </div>`).join('');
 }
@@ -753,7 +836,8 @@ async function addRider(){
   const full_name = document.getElementById('riderName').value.trim();
   const phone = document.getElementById('riderPhone').value.trim();
   const vehicle = document.getElementById('riderVehicle').value.trim();
-  const bank_name = document.getElementById('riderBank').value.trim();
+  const bankCode = document.getElementById('riderBankCode').value;
+  const bank_name = document.getElementById('riderBankCode').selectedOptions[0]?.textContent || '';
   const account_number = document.getElementById('riderAcct').value.trim();
   const email = document.getElementById('riderEmail').value.trim();
   const password = document.getElementById('riderPassword').value;
@@ -761,6 +845,10 @@ async function addRider(){
   errEl.textContent = '';
   if(!full_name || !phone || !email || !password){
     errEl.textContent = 'Name, phone, email, and password are all required.';
+    return;
+  }
+  if(!riderAccountVerified){
+    errEl.textContent = 'Verify the rider\'s bank account before adding them.';
     return;
   }
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -772,13 +860,22 @@ async function addRider(){
   const result = await resp.json();
   if(!resp.ok){ errEl.textContent = result.error || 'Could not create rider account.'; return; }
 
+  // Now that the rider row exists, create their verified Paystack recipient
+  try {
+    await fetch('/api/create-transfer-recipient', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ recipientType: 'rider', id: result.rider.id, accountNumber: account_number, bankCode })
+    });
+  } catch(e){ console.error('Rider recipient creation failed', e); }
+
   document.getElementById('riderName').value='';
   document.getElementById('riderPhone').value='';
   document.getElementById('riderVehicle').value='';
-  document.getElementById('riderBank').value='';
   document.getElementById('riderAcct').value='';
   document.getElementById('riderEmail').value='';
   document.getElementById('riderPassword').value='';
+  resetRiderVerification();
   await loadRiders();
 }
 
