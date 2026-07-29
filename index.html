@@ -557,8 +557,9 @@ reflectLoginState();
 supabaseClient.auth.onAuthStateChange(() => reflectLoginState());
 
 async function loadHomepageStores(){
+  // Public-safe view — excludes bank details and recipient codes entirely
   const { data: vendors } = await supabaseClient
-    .from('vendors').select('*').eq('status', 'approved');
+    .from('public_vendor_listings').select('*');
   allHomepageVendors = vendors || [];
   renderHomepageStores(allHomepageVendors);
 }
