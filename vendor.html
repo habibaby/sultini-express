@@ -480,7 +480,7 @@ async function loadBankList(){
     select.innerHTML = '<option value="">Select your bank</option>' +
       result.banks.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
   } catch(e){
-    select.innerHTML = '<option value="">Could not load banks — check your connection and reopen this page</option>';
+    select.innerHTML = `<option value="">${e.message || 'Could not load banks — check your connection and reopen this page'}</option>`;
   }
 }
 
