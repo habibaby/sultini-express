@@ -308,6 +308,17 @@
     <div class="tab" data-tab="earnings" onclick="switchTab('earnings')">Earnings</div>
   </div>
 
+  <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:14px 0;">
+    <div style="font-weight:700; margin-bottom:4px;">Store hours</div>
+    <div class="note" style="margin-bottom:10px;">Customers can't order outside these hours. Leave blank for no restriction (open whenever the platform allows delivery).</div>
+    <div class="field-row" style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label>Opens</label><input type="time" id="vendorOpeningTime"></div>
+      <div class="field" style="flex:1;"><label>Closes</label><input type="time" id="vendorClosingTime"></div>
+    </div>
+    <button class="btn" onclick="saveStoreHours()" style="margin-top:6px;">Save hours</button>
+    <div id="storeHoursSaved" style="font-size:12.5px; margin-top:6px; font-weight:600;"></div>
+  </div>
+
   <!-- ORDERS TAB -->
   <div id="tab-orders">
     <div class="note">Loading orders…</div>
@@ -675,10 +686,25 @@ async function goDashboard(){
   document.getElementById('backBtn').style.visibility = 'visible';
   document.querySelector('#screen-dashboard .step-title').textContent = currentVendor.name;
   document.getElementById('dashboardStorePhoto').src = currentVendor.cover_image_url || '';
+  document.getElementById('vendorOpeningTime').value = currentVendor.opening_time || '';
+  document.getElementById('vendorClosingTime').value = currentVendor.closing_time || '';
   await loadOrders();
   await loadMenu();
   await loadEarnings();
   window.scrollTo(0,0);
+}
+
+async function saveStoreHours(){
+  const opening_time = document.getElementById('vendorOpeningTime').value || null;
+  const closing_time = document.getElementById('vendorClosingTime').value || null;
+  const { error } = await supabaseClient.from('vendors').update({ opening_time, closing_time }).eq('id', currentVendor.id);
+  const savedEl = document.getElementById('storeHoursSaved');
+  if(error){ savedEl.style.color = 'var(--red)'; savedEl.textContent = 'Could not save: ' + error.message; return; }
+  currentVendor.opening_time = opening_time;
+  currentVendor.closing_time = closing_time;
+  savedEl.style.color = 'var(--green)';
+  savedEl.textContent = '✓ Saved';
+  setTimeout(()=>{ savedEl.textContent=''; }, 3000);
 }
 
 async function changeStorePhoto(inputEl){
