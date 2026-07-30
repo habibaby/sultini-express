@@ -47,6 +47,8 @@
 
   .store-list{display:flex; flex-direction:column; gap:14px;}
   .store-row{display:flex; gap:12px; background:#fff; border-radius:16px; padding:10px; border:1px solid var(--line); box-shadow:0 8px 20px -14px rgba(107,80,88,0.4);}
+  .store-row-closed{opacity:0.55;}
+  .store-closed-badge{display:inline-block; font-size:10.5px; font-weight:700; background:#F4C2C2; color:#7A2E2E; padding:2px 8px; border-radius:20px; vertical-align:middle; margin-left:4px;}
   .store-row img{width:88px; height:88px; border-radius:12px; object-fit:cover; flex:0 0 auto; background:var(--stone);}
   .store-row-body{display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0;}
   .store-row-body h3{font-size:15.5px; font-weight:700; color:var(--ink);}
@@ -167,6 +169,7 @@
       <div class="meta" id="storeHeroMeta"></div>
     </div>
   </div>
+  <div id="storeAvailabilityBanner" style="display:none; margin:12px 16px; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:600;"></div>
   <div id="menuContainer"></div>
 </section>
 
@@ -313,14 +316,54 @@ let fulfilment = null;
 let pickupTime = null;
 let DELIVERY_FEE = 1500; // overwritten by loadPlatformSettings() below with the real admin-set value
 let COD_UNLOCK_COUNT = 5; // overwritten by loadPlatformSettings() below
+let DELIVERY_CUTOFF_TIME = '19:00'; // overwritten by loadPlatformSettings() below
 const CUSTOMER = { loggedIn: false, completedOrders: 0, email: null };
 
 async function loadPlatformSettings(){
-  const { data } = await supabaseClient.from('platform_settings').select('*');
+  // Was previously reading the raw platform_settings table, which is
+  // admin-only under RLS — customers always got zero rows back and
+  // silently ran on hardcoded fallbacks. Now reads the public-safe view.
+  const { data } = await supabaseClient.from('public_platform_settings').select('*');
   (data||[]).forEach(s => {
     if(s.key === 'delivery_fee') DELIVERY_FEE = Number(s.value);
     if(s.key === 'cod_unlock_order_count') COD_UNLOCK_COUNT = Number(s.value);
+    if(s.key === 'delivery_cutoff_time') DELIVERY_CUTOFF_TIME = s.value;
   });
+}
+
+// A store is open if the current time is within its own hours (if set)
+// AND, for delivery specifically, before the platform-wide cutoff too —
+// whichever restriction is tighter wins. No hours set = always open.
+function getStoreAvailability(store){
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const toMinutes = (t) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+
+  const hasHours = store.opening_time && store.closing_time;
+  const withinOwnHours = !hasHours || (
+    nowMinutes >= toMinutes(store.opening_time) && nowMinutes <= toMinutes(store.closing_time)
+  );
+
+  if(!withinOwnHours){
+    return { open: false, deliveryAvailable: false, message: `Closed — opens at ${formatTime(store.opening_time)}` };
+  }
+
+  const cutoffMinutes = toMinutes(DELIVERY_CUTOFF_TIME);
+  const ownClosingMinutes = hasHours ? toMinutes(store.closing_time) : Infinity;
+  const effectiveCutoff = Math.min(cutoffMinutes, ownClosingMinutes);
+  const deliveryAvailable = nowMinutes <= effectiveCutoff;
+
+  if(!deliveryAvailable){
+    return { open: true, deliveryAvailable: false, message: `Delivery has ended for today — pickup still available${hasHours ? ' until ' + formatTime(store.closing_time) : ''}` };
+  }
+  return { open: true, deliveryAvailable: true, message: '' };
+}
+function formatTime(t){
+  if(!t) return '';
+  const [h,m] = t.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
 }
 
 function showForgotPassword(){
@@ -361,6 +404,12 @@ supabaseClient.auth.onAuthStateChange((event) => {
 });
 
 async function refreshAuthState(){
+  // If we're in the middle of a password recovery flow, never let this
+  // function show the normal logged-in view — no matter which listener
+  // or how many times it gets called, the reset-password form must stay
+  // on screen until the person actually sets a new password.
+  if(window.location.hash.includes('type=recovery')) return;
+
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session){
     CUSTOMER.loggedIn = true;
@@ -595,6 +644,8 @@ async function loadStores(){
       img: v.cover_image_url || items[0]?.photo_url || '',
       rating: v.rating || 0,
       time: (v.avg_delivery_minutes || 25) + ' min',
+      opening_time: v.opening_time || null,
+      closing_time: v.closing_time || null,
       menu: items.map(m => ({
         id: m.id, name: m.name, desc: m.description, price: Number(m.price),
         img: m.photo_url, inStock: m.in_stock
@@ -632,15 +683,21 @@ function renderStores(filterCat){
     list.innerHTML = `<div class="empty-state"><div class="icon">🏪</div>No stores or dishes match${q ? ` "${currentSearchTerm}"` : ' this category yet'}.</div>`;
     return;
   }
-  list.innerHTML = filtered.map(s => `
-    <a href="#" class="store-row" onclick="openStore('${s.id}');return false;">
+  list.innerHTML = filtered.map(s => {
+    const avail = getStoreAvailability(s);
+    const badge = !avail.open
+      ? `<span class="store-closed-badge">Closed</span>`
+      : (!avail.deliveryAvailable ? `<span class="store-closed-badge" style="background:#F0E6CE; color:#6B5058;">Pickup only</span>` : '');
+    return `
+    <a href="#" class="store-row${!avail.open ? ' store-row-closed' : ''}" onclick="openStore('${s.id}');return false;">
       <img src="${s.img}" alt="${s.name}">
       <div class="store-row-body">
-        <h3>${s.name}</h3>
+        <h3>${s.name} ${badge}</h3>
         <div class="store-row-meta"><span class="rating">★ ${s.rating}</span><span>· ${s.time}</span></div>
       </div>
     </a>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function handleStoreSearch(value){
@@ -660,6 +717,26 @@ function openStore(id){
   document.getElementById('storeHeroImg').src = currentStore.img;
   document.getElementById('storeHeroName').textContent = currentStore.name;
   document.getElementById('storeHeroMeta').textContent = `★ ${currentStore.rating} · ${currentStore.time}`;
+
+  const avail = getStoreAvailability(currentStore);
+  const bannerEl = document.getElementById('storeAvailabilityBanner');
+  const deliveryOpt = document.getElementById('optDelivery');
+  if(!avail.open){
+    bannerEl.style.display = 'block';
+    bannerEl.textContent = avail.message;
+    bannerEl.style.background = '#F4C2C2'; bannerEl.style.color = '#7A2E2E';
+    deliveryOpt.classList.add('disabled'); deliveryOpt.style.pointerEvents = 'none'; deliveryOpt.style.opacity = '0.5';
+  } else if(!avail.deliveryAvailable){
+    bannerEl.style.display = 'block';
+    bannerEl.textContent = avail.message;
+    bannerEl.style.background = '#F0E6CE'; bannerEl.style.color = '#6B5058';
+    deliveryOpt.classList.add('disabled'); deliveryOpt.style.pointerEvents = 'none'; deliveryOpt.style.opacity = '0.5';
+    document.getElementById('optPickup').click();
+  } else {
+    bannerEl.style.display = 'none';
+    deliveryOpt.classList.remove('disabled'); deliveryOpt.style.pointerEvents = ''; deliveryOpt.style.opacity = '';
+  }
+
   renderMenu();
   showScreen('screen-store', true);
 }
@@ -694,6 +771,8 @@ function renderMenuItem(item){
 }
 
 function addToCart(itemId){
+  const avail = getStoreAvailability(currentStore);
+  if(!avail.open){ alert(avail.message); return; }
   const item = currentStore.menu.find(i=>i.id===itemId);
   const existingVendorIds = new Set(Object.values(cart).map(c => c.store.id));
   if(existingVendorIds.size > 0 && !existingVendorIds.has(currentStore.id)){
