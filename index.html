@@ -590,12 +590,27 @@ async function reflectLoginState(){
 reflectLoginState();
 supabaseClient.auth.onAuthStateChange(() => reflectLoginState());
 
+let DELIVERY_CUTOFF_TIME = '19:00';
+
 async function loadHomepageStores(){
   // Public-safe view — excludes bank details and recipient codes entirely
   const { data: vendors } = await supabaseClient
     .from('public_vendor_listings').select('*');
   allHomepageVendors = vendors || [];
+
+  const { data: settings } = await supabaseClient.from('public_platform_settings').select('*');
+  const cutoffSetting = (settings || []).find(s => s.key === 'delivery_cutoff_time');
+  if(cutoffSetting) DELIVERY_CUTOFF_TIME = cutoffSetting.value;
+
   renderHomepageStores(allHomepageVendors);
+}
+
+function isStoreOpenNow(v){
+  if(!v.opening_time || !v.closing_time) return true; // no hours set = always open
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const toMinutes = (t) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+  return nowMinutes >= toMinutes(v.opening_time) && nowMinutes <= toMinutes(v.closing_time);
 }
 
 function renderHomepageStores(vendors){
@@ -604,18 +619,21 @@ function renderHomepageStores(vendors){
     grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">No stores match that category yet.</div>';
     return;
   }
-  grid.innerHTML = vendors.slice(0,6).map(v => `
-    <a href="order.html?store=${v.id}" class="store-card" style="display:block;">
+  grid.innerHTML = vendors.slice(0,6).map(v => {
+    const open = isStoreOpenNow(v);
+    return `
+    <a href="order.html?store=${v.id}" class="store-card" style="display:block; ${open ? '' : 'opacity:0.55;'}">
       <div class="store-img">
         <img src="${v.cover_image_url || ''}" alt="${v.name}" style="background:var(--stone);">
-        <span class="store-badge ${v.category==='Pharmacy'?'rx':''}">${v.category==='Pharmacy' ? 'Pharmacy · '+(v.avg_delivery_minutes||20)+' min' : (v.avg_delivery_minutes||25)+' min'}</span>
+        <span class="store-badge ${v.category==='Pharmacy'?'rx':''}">${!open ? 'Closed' : (v.category==='Pharmacy' ? 'Pharmacy · '+(v.avg_delivery_minutes||20)+' min' : (v.avg_delivery_minutes||25)+' min')}</span>
       </div>
       <div class="store-body">
         <h3>${v.name}</h3>
         <div class="store-meta"><span class="rating">★ ${v.rating || '—'}</span><span>· ${v.category}</span></div>
       </div>
     </a>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function filterByCategory(category){
