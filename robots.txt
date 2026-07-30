@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /vendor.html
+Disallow: /rider.html
+
+Sitemap: https://sultini.com/sitemap.xml
