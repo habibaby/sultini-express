@@ -606,6 +606,7 @@ async function loadHomepageStores(){
 }
 
 function isStoreOpenNow(v){
+  if(v.is_open === false) return false; // manual override always wins
   if(!v.opening_time || !v.closing_time) return true; // no hours set = always open
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
