@@ -335,6 +335,12 @@ async function loadPlatformSettings(){
 // AND, for delivery specifically, before the platform-wide cutoff too —
 // whichever restriction is tighter wins. No hours set = always open.
 function getStoreAvailability(store){
+  // Manual override always wins — a vendor pressing "Closed" means closed,
+  // full stop, no matter what their scheduled hours say.
+  if(store.is_open === false){
+    return { open: false, deliveryAvailable: false, message: 'This store has closed for now — check back later.' };
+  }
+
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const toMinutes = (t) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
@@ -646,6 +652,7 @@ async function loadStores(){
       time: (v.avg_delivery_minutes || 25) + ' min',
       opening_time: v.opening_time || null,
       closing_time: v.closing_time || null,
+      is_open: v.is_open,
       menu: items.map(m => ({
         id: m.id, name: m.name, desc: m.description, price: Number(m.price),
         img: m.photo_url, inStock: m.in_stock
