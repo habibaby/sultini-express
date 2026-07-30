@@ -254,6 +254,11 @@
     <div class="field"><label>Account name</label><input type="text" id="vdAcctName"></div>
   </div>
   <div class="field"><label>Typical prep + delivery time (minutes)</label><input type="number" id="vdDeliveryMinutes"></div>
+  <div class="field-row">
+    <div class="field"><label>Opening time</label><input type="time" id="vdOpeningTime"></div>
+    <div class="field"><label>Closing time</label><input type="time" id="vdClosingTime"></div>
+  </div>
+  <div class="meta">Leave blank if this store doesn't want hours restrictions. If set, customers can't order outside these hours, even if within the platform's delivery cutoff.</div>
   <button class="btn" onclick="saveVendorDetail()">Save changes</button>
   <div id="vdSaved" style="font-size:12.5px; margin-top:8px; font-weight:600;"></div>
 
@@ -515,6 +520,8 @@ async function viewVendorDetail(id){
   document.getElementById('vdAcctNumber').value = v.account_number || '';
   document.getElementById('vdAcctName').value = v.account_name || '';
   document.getElementById('vdDeliveryMinutes').value = v.avg_delivery_minutes || 25;
+  document.getElementById('vdOpeningTime').value = v.opening_time || '';
+  document.getElementById('vdClosingTime').value = v.closing_time || '';
   document.getElementById('vdCategorySelect').innerHTML = VENDOR_CATEGORIES.map(c =>
     `<option value="${c}" ${c===v.category?'selected':''}>${c}</option>`).join('');
 
@@ -558,6 +565,8 @@ async function saveVendorDetail(){
     account_number: document.getElementById('vdAcctNumber').value.trim(),
     account_name: document.getElementById('vdAcctName').value.trim(),
     avg_delivery_minutes: Number(document.getElementById('vdDeliveryMinutes').value) || 25,
+    opening_time: document.getElementById('vdOpeningTime').value || null,
+    closing_time: document.getElementById('vdClosingTime').value || null,
   };
   const { error } = await supabaseClient.from('vendors').update(updates).eq('id', currentDetailVendorId);
   const savedEl = document.getElementById('vdSaved');
@@ -954,20 +963,21 @@ async function loadSettings(){
     vendor_share_pct: 'Vendor share of item sales (%)',
     rider_share_pct: 'Rider share of delivery fee (%)',
     cod_unlock_order_count: 'Orders needed to unlock cash on delivery',
-    dispute_window_hours: 'Dispute window (hours) before cash-out'
+    dispute_window_hours: 'Dispute window (hours) before cash-out',
+    delivery_cutoff_time: 'Delivery cutoff time (deliveries stop after this, platform-wide)'
   };
-  const order = ['delivery_fee','vendor_share_pct','rider_share_pct','cod_unlock_order_count','dispute_window_hours'];
+  const order = ['delivery_fee','vendor_share_pct','rider_share_pct','cod_unlock_order_count','dispute_window_hours','delivery_cutoff_time'];
 
   document.getElementById('settingsForm').innerHTML = order.map(key => `
     <div class="field">
       <label>${labels[key] || key}</label>
-      <input type="number" id="setting-${key}" value="${platformSettings[key] || ''}">
+      <input type="${key === 'delivery_cutoff_time' ? 'time' : 'number'}" id="setting-${key}" value="${platformSettings[key] || ''}">
     </div>
   `).join('');
 }
 
 async function saveSettings(){
-  const keys = ['delivery_fee','vendor_share_pct','rider_share_pct','cod_unlock_order_count','dispute_window_hours'];
+  const keys = ['delivery_fee','vendor_share_pct','rider_share_pct','cod_unlock_order_count','dispute_window_hours','delivery_cutoff_time'];
   for(const key of keys){
     const value = document.getElementById('setting-'+key).value;
     await supabaseClient.from('platform_settings').update({ value: String(value), updated_at: new Date().toISOString() }).eq('key', key);
