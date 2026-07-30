@@ -259,6 +259,15 @@
     <div class="field"><label>Closing time</label><input type="time" id="vdClosingTime"></div>
   </div>
   <div class="meta">Leave blank if this store doesn't want hours restrictions. If set, customers can't order outside these hours, even if within the platform's delivery cutoff.</div>
+
+  <div style="display:flex; align-items:center; justify-content:space-between; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; margin:12px 0;">
+    <div>
+      <div style="font-weight:700;">Right now, this store is:</div>
+      <div class="meta">Overrides scheduled hours — use for sold-out days or emergencies.</div>
+    </div>
+    <button id="vdManualOpenToggle" onclick="toggleVendorManualOpen()" style="border:none; border-radius:20px; padding:10px 16px; font-weight:700; font-size:13px; cursor:pointer;"></button>
+  </div>
+
   <button class="btn" onclick="saveVendorDetail()">Save changes</button>
   <div id="vdSaved" style="font-size:12.5px; margin-top:8px; font-weight:600;"></div>
 
@@ -522,6 +531,7 @@ async function viewVendorDetail(id){
   document.getElementById('vdDeliveryMinutes').value = v.avg_delivery_minutes || 25;
   document.getElementById('vdOpeningTime').value = v.opening_time || '';
   document.getElementById('vdClosingTime').value = v.closing_time || '';
+  renderVendorManualOpenToggle(v);
   document.getElementById('vdCategorySelect').innerHTML = VENDOR_CATEGORIES.map(c =>
     `<option value="${c}" ${c===v.category?'selected':''}>${c}</option>`).join('');
 
@@ -534,6 +544,23 @@ async function viewVendorDetail(id){
   document.getElementById('vdOrderList').innerHTML = (vendorOrders && vendorOrders.length)
     ? vendorOrders.map(o => `<div class="rider-row"><div><div class="n mono">${o.pickup_code}</div><div class="m">${o.fulfilment} · ₦${Number(o.total).toLocaleString()}</div></div><span class="pill done">${o.status}</span></div>`).join('')
     : '<div class="empty">No orders yet.</div>';
+}
+
+function renderVendorManualOpenToggle(v){
+  const btn = document.getElementById('vdManualOpenToggle');
+  const isOpen = v.is_open !== false;
+  btn.textContent = isOpen ? '● Open' : '● Closed';
+  btn.style.background = isOpen ? '#DCEFE1' : '#F4C2C2';
+  btn.style.color = isOpen ? '#1F5D3A' : '#7A2E2E';
+}
+
+async function toggleVendorManualOpen(){
+  const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+  const newState = !(v.is_open !== false);
+  const { error } = await supabaseClient.from('vendors').update({ is_open: newState }).eq('id', currentDetailVendorId);
+  if(error){ alert('Could not update: ' + error.message); return; }
+  v.is_open = newState;
+  renderVendorManualOpenToggle(v);
 }
 
 function safeFileName(originalName){
