@@ -1,0 +1,112 @@
+// /api/notify.js
+//
+// Combines what used to be three separate endpoints (notify-admin,
+// notify-customer, notify-riders-new-delivery) into one, purely to stay
+// under Vercel's 12-serverless-function limit on the free Hobby plan —
+// deploys started failing once the project crossed that count.
+//
+// Pass { type: 'admin' | 'customer' | 'riders_new_delivery', ...payload }.
+//
+// NOTE: the old notify-admin.js had entirely wrong code in it — a stray
+// duplicate of the payment-verification logic, not a notification
+// function at all. Every "new vendor application" notice has silently
+// failed until now. Fixed here as part of the merge.
+
+const STATUS_MESSAGES = {
+  rejected: {
+    subject: "Your order couldn't be accepted",
+    text: (code) => `Unfortunately the store wasn't able to accept your order ${code}. If you paid online, please contact Sultini Express support about a refund.`,
+  },
+  preparing: {
+    subject: 'Your order is being prepared',
+    text: (code) => `Good news — your order ${code} has been accepted and is now being prepared.`,
+  },
+  ready: {
+    subject: 'Your order is ready',
+    text: (code) => `Your order ${code} is ready! If you chose pickup, you can collect it now with your pickup code.`,
+  },
+  out_for_delivery: {
+    subject: 'A rider is on the way to pick up your order',
+    text: (code) => `A Sultini rider has been assigned to your order ${code} and is heading to the store now.`,
+  },
+  picked_up: {
+    subject: 'Your order is on its way to you',
+    text: (code) => `Your rider has picked up order ${code} and is on the way to you now.`,
+  },
+  delivered: {
+    subject: 'Your order has been delivered',
+    text: (code) => `Order ${code} has been marked as delivered. Enjoy! If anything was wrong, you can report a problem from your account page.`,
+  },
+  completed: {
+    subject: 'Thanks for picking up your order!',
+    text: (code) => `Order ${code} has been confirmed picked up. Enjoy! If anything was wrong, you can report a problem from your account page.`,
+  },
+};
+
+async function sendEmail(to, subject, text) {
+  return fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+    body: JSON.stringify({ from: 'Sultini Express <notifications@sultini.com>', to: [to], subject, text }),
+  });
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { type } = req.body;
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sbHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` };
+
+  try {
+    // ---- Admin notification: simple subject/message, e.g. new vendor application ----
+    if (type === 'admin') {
+      const { subject, message } = req.body;
+      if (!subject || !message) return res.status(400).json({ error: 'Missing subject or message' });
+      await sendEmail('sultiniexpress@yahoo.com', `Sultini Express: ${subject}`, message);
+      return res.status(200).json({ success: true });
+    }
+
+    // ---- Customer notification: order status changed ----
+    if (type === 'customer') {
+      const { orderId, status } = req.body;
+      if (!orderId || !status) return res.status(400).json({ error: 'Missing orderId or status' });
+
+      const template = STATUS_MESSAGES[status];
+      if (!template) return res.status(200).json({ skipped: true }); // not every status needs an email
+
+      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,customer_email`, { headers: sbHeaders });
+      const orders = await orderRes.json();
+      const order = orders && orders[0];
+      if (!order || !order.customer_email) return res.status(200).json({ skipped: true, reason: 'No customer email on file' });
+
+      await sendEmail(order.customer_email, `Sultini Express: ${template.subject}`, template.text(order.pickup_code));
+      return res.status(200).json({ success: true });
+    }
+
+    // ---- Rider notification: new delivery available for anyone to claim ----
+    if (type === 'riders_new_delivery') {
+      const { pickupCode } = req.body;
+      if (!pickupCode) return res.status(400).json({ error: 'Missing pickupCode' });
+
+      const ridersRes = await fetch(`${SUPABASE_URL}/rest/v1/riders?active=eq.true&select=email`, { headers: sbHeaders });
+      const riders = await ridersRes.json();
+      const emails = (riders || []).map(r => r.email).filter(Boolean);
+      if (emails.length === 0) return res.status(200).json({ skipped: true, reason: 'No active riders with an email on file' });
+
+      await Promise.all(emails.map(email =>
+        sendEmail(email, 'New delivery available', `A new delivery (order ${pickupCode}) is ready and needs a rider. Log into your Sultini rider dashboard to accept it.`)
+          .catch(e => console.error('Failed to notify', email, e))
+      ));
+      return res.status(200).json({ success: true, notified: emails.length });
+    }
+
+    return res.status(400).json({ error: `Unknown notification type: ${type}` });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Notification failed' });
+  }
+}
