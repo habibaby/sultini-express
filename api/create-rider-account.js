@@ -90,7 +90,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { ...adminHeaders, Prefer: 'return=representation' },
       body: JSON.stringify([{
-        full_name, phone, vehicle: vehicle || null, email, active: true,
+        full_name, phone, vehicle: vehicle || null, active: true,
         bank_name: bank_name || null, account_number: account_number || null,
         user_id: userId, added_by: added_by || null,
         dedicated_vendor_id: dedicated_vendor_id || null,
