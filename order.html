@@ -122,6 +122,21 @@
   .ticket-main .code{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--plum); margin-top:4px;}
   .ticket-main .sub{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
   .ticket-stub{width:70px; flex:0 0 auto; background:var(--stone); display:flex; align-items:center; justify-content:center;}
+
+  .status-timeline{display:flex; align-items:flex-start; justify-content:space-between; margin:22px 0 4px; padding:0 4px;}
+  .status-step{display:flex; flex-direction:column; align-items:center; flex:1; position:relative;}
+  .status-step:not(:last-child)::after{
+    content:""; position:absolute; top:11px; left:calc(50% + 16px); right:calc(-50% + 16px);
+    height:2px; background:var(--line);
+  }
+  .status-step.done:not(:last-child)::after{ background:var(--plum); }
+  .status-dot{width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--ink-soft); z-index:1;}
+  .status-step.done .status-dot{ background:var(--plum); border-color:var(--plum); color:#fff; }
+  .status-step.active .status-dot{ border-color:var(--rose-deep); color:var(--rose-deep); animation:pulseDot 1.6s ease-in-out infinite; }
+  .status-label{font-size:10.5px; color:var(--ink-soft); margin-top:6px; text-align:center; max-width:64px;}
+  .status-step.done .status-label, .status-step.active .status-label{ color:var(--plum); font-weight:700; }
+  @keyframes pulseDot{ 0%,100%{ box-shadow:0 0 0 0 rgba(198,87,122,0.35); } 50%{ box-shadow:0 0 0 5px rgba(198,87,122,0); } }
+  .status-cancelled{ text-align:center; color:var(--red, #B84C4C); font-weight:700; font-size:13px; margin:16px 0; }
   .ticket-stub span{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; color:var(--plum-deep); transform:rotate(90deg); white-space:nowrap; letter-spacing:0.08em;}
 
   .empty-cart, .empty-state{text-align:center; padding:60px 20px; color:var(--ink-soft);}
@@ -201,7 +216,8 @@
   <div class="option-group" id="deliveryAddressGroup" style="display:none;">
     <div class="option-label">Delivery address</div>
     <div id="checkoutSavedAddresses" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
-    <input id="deliveryAddressInput" type="text" placeholder="e.g. No. 4 Runjin Sambo Road, Sokoto" class="search-bar" style="width:100%; text-align:left;">
+    <input id="deliveryAddressInput" type="text" placeholder="e.g. No. 4 Runjin Sambo Road, Sokoto" class="search-bar" style="width:100%; text-align:left;" onblur="calculateRealDeliveryFee()">
+    <div id="deliveryFeeResult" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
     <label id="saveAddressLabel" style="display:none; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); margin-top:8px;">
       <input type="checkbox" id="saveAddressCheckbox"> Save this address for next time
     </label>
@@ -245,6 +261,7 @@
       </div>
       <div class="ticket-stub"><span>SULTINI</span></div>
     </div>
+    <div id="liveStatusTimeline" class="status-timeline"></div>
     <button class="btn btn-primary" id="backToBrowseBtn" style="margin-top:30px;">Back to browsing</button>
   </div>
 </section>
@@ -317,7 +334,44 @@ let pickupTime = null;
 let DELIVERY_FEE = 1500; // overwritten by loadPlatformSettings() below with the real admin-set value
 let COD_UNLOCK_COUNT = 5; // overwritten by loadPlatformSettings() below
 let DELIVERY_CUTOFF_TIME = '19:00'; // overwritten by loadPlatformSettings() below
+let REAL_DELIVERY_FEE = null; // set once the address is geocoded; falls back to DELIVERY_FEE until then
+let REAL_DELIVERY_DISTANCE_KM = null;
+let REAL_DELIVERY_LAT = null;
+let REAL_DELIVERY_LNG = null;
 const CUSTOMER = { loggedIn: false, completedOrders: 0, email: null };
+
+async function calculateRealDeliveryFee(){
+  const address = document.getElementById('deliveryAddressInput').value.trim();
+  const resultEl = document.getElementById('deliveryFeeResult');
+  if(!address || !currentStore){ return; }
+  REAL_DELIVERY_FEE = null; REAL_DELIVERY_DISTANCE_KM = null;
+  resultEl.textContent = 'Calculating delivery fee for your address…';
+  try {
+    const geoResp = await fetch('/api/geocode', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'geocode', address })
+    });
+    const geoResult = await geoResp.json();
+    if(!geoResp.ok){ resultEl.textContent = `Could not find that address — using the standard delivery fee.`; renderSummary(); return; }
+
+    const feeResp = await fetch('/api/geocode', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'calculate-fee', vendorId: currentStore.id, lat: geoResult.lat, lng: geoResult.lng })
+    });
+    const feeResult = await feeResp.json();
+    if(!feeResp.ok){ resultEl.textContent = feeResult.fallback ? 'This store hasn\'t confirmed its exact location yet — using the standard delivery fee.' : 'Could not calculate an exact fee — using the standard delivery fee.'; renderSummary(); return; }
+
+    REAL_DELIVERY_FEE = feeResult.fee;
+    REAL_DELIVERY_DISTANCE_KM = feeResult.distanceKm;
+    REAL_DELIVERY_LAT = geoResult.lat;
+    REAL_DELIVERY_LNG = geoResult.lng;
+    resultEl.textContent = `✓ ${feeResult.distanceKm}km away — delivery fee calculated for your exact address.`;
+    renderSummary();
+  } catch(e){
+    resultEl.textContent = 'Could not calculate an exact fee — using the standard delivery fee.';
+    renderSummary();
+  }
+}
 
 async function loadPlatformSettings(){
   // Was previously reading the raw platform_settings table, which is
@@ -493,8 +547,9 @@ async function loadOrderHistory(){
     <div class="cart-item" style="align-items:flex-start; flex-direction:column; gap:6px;">
       <div class="cart-item-body">
         <h4 class="mono">${o.pickup_code}</h4>
-        <div class="price">${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()} · ${o.status}</div>
+        <div class="price">${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</div>
       </div>
+      <div id="historyTimeline-${o.id}" class="status-timeline" style="margin:8px 0 0; transform:scale(0.9); transform-origin:left;"></div>
       ${disputeSection}
       <div id="disputeForm-${o.id}" style="display:none; width:100%; margin-top:6px;">
         <textarea id="disputeReason-${o.id}" placeholder="What went wrong?" rows="3" style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px; font-family:inherit;"></textarea>
@@ -503,6 +558,25 @@ async function loadOrderHistory(){
     </div>
   `;
   }).join('');
+
+  orders.forEach(o => {
+    const timelineEl = document.getElementById('historyTimeline-' + o.id);
+    if(timelineEl) renderStatusTimeline(timelineEl, o.status, o.fulfilment);
+  });
+
+  trackAllOrdersLive(session.user.id);
+}
+
+let liveHistoryChannel = null;
+function trackAllOrdersLive(customerId){
+  if(liveHistoryChannel) supabaseClient.removeChannel(liveHistoryChannel);
+  liveHistoryChannel = supabaseClient
+    .channel('customer-orders-' + customerId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` }, (payload) => {
+      const timelineEl = document.getElementById('historyTimeline-' + payload.new.id);
+      if(timelineEl) renderStatusTimeline(timelineEl, payload.new.status, payload.new.fulfilment);
+    })
+    .subscribe();
 }
 
 async function cancelOrder(orderId){
@@ -873,11 +947,13 @@ function updatePayOptions(){
 }
 function renderSummary(){
   const {subtotal} = cartTotals();
-  const deliveryFee = fulfilment==='delivery' ? DELIVERY_FEE : 0;
+  const deliveryFee = fulfilment==='delivery' ? (REAL_DELIVERY_FEE ?? DELIVERY_FEE) : 0;
   const total = subtotal + deliveryFee;
+  const distanceNote = (fulfilment==='delivery' && REAL_DELIVERY_DISTANCE_KM != null)
+    ? ` <span style="color:var(--ink-soft); font-weight:400;">(${REAL_DELIVERY_DISTANCE_KM}km)</span>` : '';
   document.getElementById('summaryContainer').innerHTML = `
     <div class="summary-row"><span>Subtotal</span><span>₦${subtotal.toLocaleString()}</span></div>
-    <div class="summary-row"><span>Delivery fee</span><span>${fulfilment==='delivery' ? '₦'+deliveryFee.toLocaleString() : (fulfilment==='pickup' ? 'Free (pickup)' : '—')}</span></div>
+    <div class="summary-row"><span>Delivery fee${distanceNote}</span><span>${fulfilment==='delivery' ? '₦'+deliveryFee.toLocaleString() : (fulfilment==='pickup' ? 'Free (pickup)' : '—')}</span></div>
     <div class="summary-row total"><span>Total</span><span>₦${total.toLocaleString()}</span></div>`;
   const ready = fulfilment && (fulfilment==='delivery' || (fulfilment==='pickup' && pickupTime));
   document.getElementById('placeOrderBtn').classList.toggle('disabled', !ready);
@@ -1016,7 +1092,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   }
 
   const {subtotal} = cartTotals();
-  const deliveryFee = fulfilment==='delivery' ? DELIVERY_FEE : 0;
+  const deliveryFee = fulfilment==='delivery' ? (REAL_DELIVERY_FEE ?? DELIVERY_FEE) : 0;
   const total = subtotal + deliveryFee;
   const vendorId = Object.values(cart)[0].store.id; // NOTE: assumes single-vendor cart for now
 
@@ -1030,6 +1106,8 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
     total,
     pickupTimeChoice: fulfilment==='pickup' ? pickupTime : null,
     deliveryAddress: fulfilment==='delivery' ? document.getElementById('deliveryAddressInput').value.trim() : null,
+    deliveryLat: fulfilment==='delivery' ? REAL_DELIVERY_LAT : null,
+    deliveryLng: fulfilment==='delivery' ? REAL_DELIVERY_LNG : null,
     guestName, guestPhone, guestEmail
   };
 
@@ -1047,7 +1125,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
       });
       const result = await resp.json();
       if(!resp.ok) throw new Error(result.error || 'Could not charge saved card');
-      showConfirmation(result.pickupCode);
+      showConfirmation(result.pickupCode, result.orderId);
     } catch (err) {
       console.error(err);
       alert('Could not charge that card: ' + err.message);
@@ -1075,7 +1153,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
         });
         const result = await resp.json();
         if(!resp.ok) throw new Error(result.error || 'Could not save order');
-        showConfirmation(result.pickupCode);
+        showConfirmation(result.pickupCode, result.orderId);
       } catch (err) {
         console.error(err);
         alert('Payment succeeded but saving the order failed. Please contact support with reference: ' + transaction.reference);
@@ -1091,12 +1169,58 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   });
 });
 
-function showConfirmation(pickupCode){
+// ---- Live order status timeline ----
+const PICKUP_STEPS = [
+  { key: 'placed', label: 'Placed', match: ['new','accepted'] },
+  { key: 'preparing', label: 'Preparing', match: ['preparing'] },
+  { key: 'ready', label: 'Ready for pickup', match: ['ready'] },
+  { key: 'done', label: 'Picked up', match: ['completed','picked_up'] },
+];
+const DELIVERY_STEPS = [
+  { key: 'placed', label: 'Placed', match: ['new','accepted'] },
+  { key: 'preparing', label: 'Preparing', match: ['preparing'] },
+  { key: 'ready', label: 'Ready', match: ['ready'] },
+  { key: 'out', label: 'On the way', match: ['out_for_delivery'] },
+  { key: 'done', label: 'Delivered', match: ['delivered'] },
+];
+
+function renderStatusTimeline(containerEl, status, fulfilment){
+  if(status === 'rejected' || status === 'cancelled'){
+    containerEl.innerHTML = `<div class="status-cancelled">${status === 'rejected' ? 'This order was declined — refunded if paid online.' : 'This order was cancelled.'}</div>`;
+    return;
+  }
+  const steps = fulfilment === 'delivery' ? DELIVERY_STEPS : PICKUP_STEPS;
+  const activeIndex = steps.findIndex(s => s.match.includes(status));
+  containerEl.innerHTML = steps.map((s, i) => {
+    const cls = i < activeIndex ? 'done' : (i === activeIndex ? 'active' : '');
+    const dotContent = i < activeIndex ? '✓' : (i + 1);
+    return `<div class="status-step ${cls}"><div class="status-dot">${dotContent}</div><div class="status-label">${s.label}</div></div>`;
+  }).join('');
+}
+
+let liveOrderChannel = null;
+function trackOrderLive(orderId, fulfilment){
+  if(liveOrderChannel) supabaseClient.removeChannel(liveOrderChannel);
+  liveOrderChannel = supabaseClient
+    .channel('order-' + orderId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
+      renderStatusTimeline(document.getElementById('liveStatusTimeline'), payload.new.status, fulfilment);
+      const subEl = document.getElementById('confirmSub');
+      if(subEl && ['ready','out_for_delivery','delivered','completed','picked_up'].includes(payload.new.status)){
+        subEl.textContent = { ready: "It's ready!", out_for_delivery: 'Your rider is on the way.', delivered: 'Delivered — enjoy!', completed: 'Picked up — enjoy!', picked_up: 'Picked up — enjoy!' }[payload.new.status] || subEl.textContent;
+      }
+    })
+    .subscribe();
+}
+
+function showConfirmation(pickupCode, orderId){
   const storeNames = [...new Set(Object.values(cart).map(c=>c.store.name))].join(', ');
   document.getElementById('confirmCode').textContent = pickupCode;
   const timeLabel = fulfilment==='delivery' ? 'On the way once ready' : (pickupTime==='now'?'Ready shortly':(pickupTime==='1hr'?'Ready in about 1 hour':'Ready at your set time'));
   document.getElementById('confirmDetail').textContent = `${timeLabel} · ${storeNames}`;
   document.getElementById('confirmSub').textContent = fulfilment==='delivery' ? "A rider will be assigned once your order is ready." : "Show this code at pickup — it's yours alone.";
+  renderStatusTimeline(document.getElementById('liveStatusTimeline'), 'new', fulfilment);
+  if(orderId) trackOrderLive(orderId, fulfilment);
   cart = {}; fulfilment = null; pickupTime = null;
   document.getElementById('optDelivery').classList.remove('selected');
   document.getElementById('optPickup').classList.remove('selected');
@@ -1122,9 +1246,5 @@ if(urlParams.get('screen') === 'account'){
   showScreen('screen-account', true);
 }
 </script>
-
-<!-- Vercel Web Analytics -->
-<script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
-
 </body>
 </html>
