@@ -324,8 +324,12 @@
 
   <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:14px 0;">
     <div style="font-weight:700; margin-bottom:4px;">Store location</div>
-    <div class="note" style="margin-bottom:10px;">Confirm your exact location so delivery fees are calculated by real distance, not a flat guess. Uses the address from your profile — add a nearby landmark if it doesn't resolve correctly.</div>
-    <button class="btn" onclick="confirmStoreLocation()">Confirm my location</button>
+    <div class="note" style="margin-bottom:10px;">Confirm your exact location so delivery fees are calculated by real distance, not a flat guess. Fix your address below if it's wrong, then confirm — add a nearby landmark if it doesn't resolve correctly.</div>
+    <div class="field">
+      <label>Address</label>
+      <input type="text" id="vendorAddressInput" placeholder="e.g. 12 Runjin Sambo Road, Sokoto">
+    </div>
+    <button class="btn" onclick="confirmStoreLocation()">Save address & confirm location</button>
     <div id="locationConfirmResult" style="font-size:12.5px; margin-top:8px;"></div>
   </div>
 
@@ -726,6 +730,7 @@ async function goDashboard(){
   document.getElementById('dashboardStorePhoto').src = currentVendor.cover_image_url || '';
   document.getElementById('vendorOpeningTime').value = currentVendor.opening_time || '';
   document.getElementById('vendorClosingTime').value = currentVendor.closing_time || '';
+  document.getElementById('vendorAddressInput').value = currentVendor.address || '';
   document.getElementById('locationConfirmResult').innerHTML = (currentVendor.lat != null)
     ? '✅ Location already confirmed — press again if your store has moved.'
     : '⚠️ Not confirmed yet — delivery fees for your store are using the standard fallback until this is done.';
@@ -758,13 +763,20 @@ async function toggleManualOpen(){
 
 async function confirmStoreLocation(){
   const resultEl = document.getElementById('locationConfirmResult');
-  if(!currentVendor.address){ resultEl.innerHTML = '<span style="color:var(--red);">Add your address in the store details first.</span>'; return; }
-  resultEl.textContent = 'Looking up your address…';
+  const address = document.getElementById('vendorAddressInput').value.trim();
+  if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Enter your store address first.</span>'; return; }
+  resultEl.textContent = 'Saving address and looking it up…';
   try {
+    // Save the corrected address first — this was the actual missing piece,
+    // there was previously no way to fix it after initial signup.
+    const { error: addrError } = await supabaseClient.from('vendors').update({ address }).eq('id', currentVendor.id);
+    if(addrError){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save address: ${addrError.message}</span>`; return; }
+    currentVendor.address = address;
+
     const resp = await fetch('/api/geocode', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'geocode', address: currentVendor.address })
+      body: JSON.stringify({ action: 'geocode', address })
     });
     const result = await resp.json();
     if(!resp.ok){ resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`; return; }
@@ -773,7 +785,7 @@ async function confirmStoreLocation(){
     if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Found it, but saving failed: ${error.message}</span>`; return; }
 
     currentVendor.lat = result.lat; currentVendor.lng = result.lng;
-    resultEl.innerHTML = `✅ Location confirmed: <strong>${result.formattedAddress}</strong>`;
+    resultEl.innerHTML = `✅ Location confirmed: <strong>${result.formattedAddress}</strong> — if this still isn't right, edit the address above and confirm again.`;
   } catch(e){
     resultEl.innerHTML = '<span style="color:var(--red);">Could not look up your address right now — try again.</span>';
   }
