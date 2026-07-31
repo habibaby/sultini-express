@@ -39,6 +39,39 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: chargeData.data?.gateway_response || 'Card charge failed' });
     }
 
+    // ---- Step 1b: recompute the delivery fee ourselves — same check as
+    // the regular checkout path, so this payment method can't be used to
+    // bypass real distance-based pricing.
+    if (order.fulfilment === 'delivery') {
+      const sbCheck = (path) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
+      }).then(r => r.json());
+
+      const vendors = await sbCheck(`vendors?id=eq.${order.vendorId}&select=lat,lng`);
+      const vendor = vendors && vendors[0];
+      let expectedFee;
+
+      if (vendor && vendor.lat != null && vendor.lng != null && order.deliveryLat != null && order.deliveryLng != null) {
+        const settings = await sbCheck(`platform_settings?key=in.(delivery_base_fee,delivery_per_km_rate,delivery_min_fee,delivery_max_fee)&select=key,value`);
+        const get = (key, fallback) => Number((settings.find(s => s.key === key) || {}).value ?? fallback);
+        const R = 6371;
+        const dLat = (order.deliveryLat - vendor.lat) * Math.PI / 180;
+        const dLng = (order.deliveryLng - vendor.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(vendor.lat * Math.PI / 180) * Math.cos(order.deliveryLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        expectedFee = Math.round(get('delivery_base_fee', 800) + distanceKm * get('delivery_per_km_rate', 120));
+        expectedFee = Math.max(get('delivery_min_fee', 1000), Math.min(get('delivery_max_fee', 3500), expectedFee));
+      } else {
+        const fallback = await sbCheck(`platform_settings?key=eq.delivery_fee&select=value`);
+        expectedFee = Number((fallback[0] || {}).value ?? 1500);
+      }
+
+      if (Math.abs(Number(order.deliveryFee) - expectedFee) > 1) {
+        console.error(`Delivery fee mismatch (saved card): client sent ${order.deliveryFee}, expected ${expectedFee}`);
+        return res.status(400).json({ error: 'Delivery fee does not match — please refresh and try again.' });
+      }
+    }
+
     // ---- Step 2: write the order to Supabase, same as a normal payment ----
     const pickupCode = 'SK-' + Math.floor(1000 + Math.random() * 9000);
 
@@ -65,6 +98,8 @@ export default async function handler(req, res) {
         delivery_address: order.deliveryAddress || null,
         subtotal: order.subtotal,
         delivery_fee: order.deliveryFee || 0,
+        delivery_lat: order.deliveryLat || null,
+        delivery_lng: order.deliveryLng || null,
         total: order.total,
         payment_method: 'online',
         payment_status: 'paid',
