@@ -28,16 +28,22 @@ export default async function handler(req, res) {
   };
 
   try {
-    // 1. Load the ledger entry and confirm it's actually payable
+    // 1. Load the ledger entry via the effective-status view — this is what
+    //    actually accounts for the dispute window AND fulfillment confirmation,
+    //    not just the raw stored status. This is the real gate; the admin UI
+    //    display is just a reflection of the same check.
     const entryRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/ledger_entries?id=eq.${ledgerEntryId}&select=*`,
+      `${SUPABASE_URL}/rest/v1/ledger_entries_effective?id=eq.${ledgerEntryId}&select=*`,
       { headers: sbHeaders }
     );
     const entries = await entryRes.json();
     const entry = entries && entries[0];
     if (!entry) return res.status(404).json({ error: 'Ledger entry not found' });
-    if (entry.status !== 'available') {
-      return res.status(400).json({ error: `This entry is '${entry.status}', not ready to pay out` });
+    if (entry.effective_status !== 'available') {
+      const reason = entry.effective_status === 'awaiting_fulfillment_confirmation'
+        ? 'the order has not been confirmed delivered or picked up yet'
+        : `it is '${entry.effective_status}'`;
+      return res.status(400).json({ error: `This entry is not ready to pay out — ${reason}.` });
     }
 
     // 2. Look up the recipient's Paystack recipient_code
