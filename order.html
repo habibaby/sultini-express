@@ -418,6 +418,19 @@ async function refreshAuthState(){
 
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session){
+    // Enforced here, not just in the login button handler — this runs on
+    // page-load auto-restore too, which was bypassing the check entirely.
+    const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+    if(profile && profile.role && profile.role !== 'customer'){
+      const pageFor = { vendor: 'vendor.html', rider: 'rider.html', admin: 'admin.html' }[profile.role] || null;
+      const errEl = document.getElementById('authError');
+      if(errEl) errEl.textContent = pageFor
+        ? `This account is registered as a ${profile.role} — please log in at ${pageFor} instead.`
+        : `This account isn't set up for customer shopping.`;
+      await supabaseClient.auth.signOut();
+      return;
+    }
+
     CUSTOMER.loggedIn = true;
     CUSTOMER.email = session.user.email;
     const { count } = await supabaseClient
@@ -589,6 +602,21 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
   errEl.textContent = '';
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ errEl.textContent = error.message; return; }
+
+  // This account exists, but is it actually meant to shop here? A vendor,
+  // rider, or admin account logging into the customer site is exactly the
+  // kind of mix-up that should be caught, not silently allowed.
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+  if(profile && profile.role && profile.role !== 'customer'){
+    const pageFor = { vendor: 'vendor.html', rider: 'rider.html', admin: 'admin.html' }[profile.role] || null;
+    errEl.textContent = pageFor
+      ? `This account is registered as a ${profile.role} — please log in at ${pageFor} instead.`
+      : `This account isn't set up for customer shopping.`;
+    await supabaseClient.auth.signOut();
+    return;
+  }
+
   await refreshAuthState(); // updates the account screen in place to show you're logged in
 });
 
