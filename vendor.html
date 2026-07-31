@@ -771,6 +771,15 @@ async function loadOrders(){
       <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
       ${o.status==='new' ? `<div class="order-actions"><button onclick="rejectOrder('${o.id}','${o.payment_method}')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
       ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}','${o.fulfilment}')">Mark as ready</button></div>` : ''}
+      ${o.status==='ready' && o.fulfilment==='pickup' ? `
+        <div class="order-actions" style="flex-direction:column; align-items:stretch; gap:6px;">
+          <div class="note">Ask the customer for their pickup code and enter it here to confirm — this is what releases the order as fulfilled.</div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="pickupCodeInput-${o.id}" placeholder="Enter customer's code" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line); text-transform:uppercase;">
+            <button class="primary" onclick="confirmPickup('${o.id}','${o.pickup_code}')">Confirm</button>
+          </div>
+        </div>` : ''}
+      ${o.status==='ready' && o.fulfilment==='delivery' ? `<div class="note" style="margin-top:6px;">Waiting for a rider to be assigned and deliver this order.</div>` : ''}
     </div>
   `).join('');
 }
@@ -800,6 +809,22 @@ async function rejectOrder(orderId, paymentMethod){
     }
   }
 
+  await loadOrders();
+}
+
+// The pickup code is the only proof a customer actually collected their
+// order — this is what makes it safe to release the vendor's payout later,
+// instead of money sitting in limbo with no confirmation it was ever fulfilled.
+async function confirmPickup(orderId, realCode){
+  const input = document.getElementById('pickupCodeInput-'+orderId);
+  const entered = (input.value || '').trim().toUpperCase();
+  if(!entered){ alert('Enter the code the customer gives you.'); return; }
+  if(entered !== String(realCode).toUpperCase()){
+    alert('That code doesn\'t match this order. Double-check with the customer before confirming.');
+    return;
+  }
+  await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
+  notifyCustomer(orderId, 'completed');
   await loadOrders();
 }
 
