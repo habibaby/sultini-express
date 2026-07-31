@@ -479,6 +479,19 @@ async function vendorLogin(){
   err.textContent = '';
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ err.textContent = error.message; return; }
+
+  // A rider or admin account has no business here — but a plain customer
+  // account is fine, that's the normal path to becoming a vendor for the
+  // first time (their role only becomes 'vendor' once they actually apply).
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+  if(profile && (profile.role === 'rider' || profile.role === 'admin')){
+    const pageFor = { rider: 'rider.html', admin: 'admin.html' }[profile.role];
+    err.textContent = `This account is registered as a ${profile.role} — please log in at ${pageFor} instead.`;
+    await supabaseClient.auth.signOut();
+    return;
+  }
+
   await afterLogin();
 }
 // ---- Bank verification (payout step) ----
@@ -560,6 +573,16 @@ async function afterLogin(){
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(!session) return;
 
+  // Enforced here, not just in vendorLogin() — this runs on page-load
+  // auto-restore too, which was bypassing the check entirely before.
+  const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+  if(profile && (profile.role === 'rider' || profile.role === 'admin')){
+    const pageFor = { rider: 'rider.html', admin: 'admin.html' }[profile.role];
+    document.getElementById('vAuthError').textContent = `This account is registered as a ${profile.role} — please log in at ${pageFor} instead.`;
+    await supabaseClient.auth.signOut();
+    return;
+  }
+
   const { data: vendors } = await supabaseClient
     .from('vendors').select('*').eq('owner_id', session.user.id).limit(1);
 
@@ -616,6 +639,11 @@ async function submitRegistration(){
   if(vErr){ alert('Could not submit: ' + vErr.message); return; }
   const vendor = vendorRows[0];
   currentVendor = vendor;
+
+  // This account is now a vendor account — tag it so it's correctly
+  // recognized (and correctly kept out of the customer/rider/admin logins)
+  // from here on.
+  await supabaseClient.from('profiles').update({ role: 'vendor' }).eq('id', session.user.id);
 
   // Create the real Paystack transfer recipient now that we have a vendor id.
   // This re-verifies server-side too, so this is never trusting the browser alone.
