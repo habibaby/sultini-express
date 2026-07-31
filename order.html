@@ -142,6 +142,7 @@
   .empty-cart, .empty-state{text-align:center; padding:60px 20px; color:var(--ink-soft);}
   .empty-state .icon{font-size:36px; margin-bottom:10px;}
 </style>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDaE3929jQWbcZAQjN4d9OHG_DV_TOAWyk&loading=async"></script>
 </head>
 <body>
 
@@ -216,7 +217,10 @@
   <div class="option-group" id="deliveryAddressGroup" style="display:none;">
     <div class="option-label">Delivery address</div>
     <div id="checkoutSavedAddresses" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
-    <input id="deliveryAddressInput" type="text" placeholder="e.g. No. 4 Runjin Sambo Road, Sokoto" class="search-bar" style="width:100%; text-align:left;" onblur="calculateRealDeliveryFee()">
+    <input id="deliveryAddressInput" type="text" placeholder="e.g. No. 4 Runjin Sambo Road, Sokoto" class="search-bar" style="width:100%; text-align:left;" onkeydown="if(event.key==='Enter'){event.preventDefault(); jumpMapToAddress('checkout');}">
+    <button type="button" class="btn" style="margin:8px 0; padding:10px;" onclick="jumpMapToAddress('checkout')">Find on map</button>
+    <div id="checkoutMapPicker" style="height:220px; border-radius:12px; background:#eee;"></div>
+    <div class="note" style="margin:6px 0;">Drag the pin to your exact spot — this is what your delivery fee is based on.</div>
     <div id="deliveryFeeResult" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
     <label id="saveAddressLabel" style="display:none; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); margin-top:8px;">
       <input type="checkbox" id="saveAddressCheckbox"> Save this address for next time
@@ -340,32 +344,72 @@ let REAL_DELIVERY_LAT = null;
 let REAL_DELIVERY_LNG = null;
 const CUSTOMER = { loggedIn: false, completedOrders: 0, email: null };
 
-async function calculateRealDeliveryFee(){
-  const address = document.getElementById('deliveryAddressInput').value.trim();
-  const resultEl = document.getElementById('deliveryFeeResult');
-  if(!address || !currentStore){ return; }
-  REAL_DELIVERY_FEE = null; REAL_DELIVERY_DISTANCE_KM = null;
-  resultEl.textContent = 'Calculating delivery fee for your address…';
+// ---- Map picker: type an address to jump there, then drag the pin to
+// the exact spot. The FINAL PIN POSITION drives the delivery fee — not
+// the typed address, which alone isn't reliably precise in Sokoto.
+const mapPickers = {};
+const SOKOTO_CENTER = { lat: 13.0059, lng: 5.2476 };
+
+function waitForGoogleMaps(cb){
+  if(window.google && window.google.maps) cb();
+  else setTimeout(() => waitForGoogleMaps(cb), 200);
+}
+
+function initMapPicker(name, containerId, initialLat, initialLng){
+  waitForGoogleMaps(() => {
+    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : SOKOTO_CENTER;
+    const map = new google.maps.Map(document.getElementById(containerId), {
+      center, zoom: initialLat != null ? 16 : 13, streetViewControl:false, mapTypeControl:false, fullscreenControl:false
+    });
+    const marker = new google.maps.Marker({ position: center, map, draggable: true });
+    mapPickers[name] = { map, marker };
+    if(name === 'checkout'){
+      marker.addListener('dragend', () => {
+        const pos = marker.getPosition();
+        REAL_DELIVERY_LAT = pos.lat(); REAL_DELIVERY_LNG = pos.lng();
+        calculateFeeFromPin();
+      });
+    }
+  });
+}
+
+async function jumpMapToAddress(name){
+  const inputId = name === 'checkout' ? 'deliveryAddressInput' : 'vendorAddressInput';
+  const address = document.getElementById(inputId).value.trim();
+  if(!address || !mapPickers[name]) return;
   try {
-    const geoResp = await fetch('/api/geocode', {
+    const resp = await fetch('/api/geocode', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ action: 'geocode', address })
     });
-    const geoResult = await geoResp.json();
-    if(!geoResp.ok){ resultEl.textContent = `Could not find that address — using the standard delivery fee.`; renderSummary(); return; }
+    const result = await resp.json();
+    if(!resp.ok) return;
+    const pos = { lat: result.lat, lng: result.lng };
+    mapPickers[name].map.setCenter(pos);
+    mapPickers[name].map.setZoom(16);
+    mapPickers[name].marker.setPosition(pos);
+    if(name === 'checkout'){
+      REAL_DELIVERY_LAT = pos.lat; REAL_DELIVERY_LNG = pos.lng;
+      calculateFeeFromPin();
+    }
+  } catch(e){ console.error('Map jump failed', e); }
+}
 
+async function calculateFeeFromPin(){
+  const resultEl = document.getElementById('deliveryFeeResult');
+  if(!currentStore || REAL_DELIVERY_LAT == null){ return; }
+  REAL_DELIVERY_FEE = null; REAL_DELIVERY_DISTANCE_KM = null;
+  resultEl.textContent = 'Calculating delivery fee…';
+  try {
     const feeResp = await fetch('/api/geocode', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'calculate-fee', vendorId: currentStore.id, lat: geoResult.lat, lng: geoResult.lng })
+      body: JSON.stringify({ action: 'calculate-fee', vendorId: currentStore.id, lat: REAL_DELIVERY_LAT, lng: REAL_DELIVERY_LNG })
     });
     const feeResult = await feeResp.json();
     if(!feeResp.ok){ resultEl.textContent = feeResult.fallback ? 'This store hasn\'t confirmed its exact location yet — using the standard delivery fee.' : 'Could not calculate an exact fee — using the standard delivery fee.'; renderSummary(); return; }
-
     REAL_DELIVERY_FEE = feeResult.fee;
     REAL_DELIVERY_DISTANCE_KM = feeResult.distanceKm;
-    REAL_DELIVERY_LAT = geoResult.lat;
-    REAL_DELIVERY_LNG = geoResult.lng;
-    resultEl.textContent = `✓ ${feeResult.distanceKm}km away — delivery fee calculated for your exact address.`;
+    resultEl.textContent = `✓ ${feeResult.distanceKm}km away — delivery fee calculated for your pinned location.`;
     renderSummary();
   } catch(e){
     resultEl.textContent = 'Could not calculate an exact fee — using the standard delivery fee.';
@@ -1033,6 +1077,7 @@ document.getElementById('optDelivery').addEventListener('click', ()=>{
   document.getElementById('deliveryAddressGroup').style.display='block';
   renderCheckoutSavedAddresses();
   document.getElementById('saveAddressLabel').style.display = CUSTOMER.loggedIn ? 'flex' : 'none';
+  if(!mapPickers['checkout']) initMapPicker('checkout', 'checkoutMapPicker', currentStore?.lat, currentStore?.lng);
   renderSummary();
 });
 document.getElementById('optPickup').addEventListener('click', ()=>{
