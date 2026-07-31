@@ -1112,8 +1112,22 @@ async function saveSettings(){
 }
 
 if(!window.location.hash.includes('type=recovery')){
-  supabaseClient.auth.getSession().then(({data:{session}}) => {
-    if(session) adminLogin(); // will re-check role; harmless if already logged in
+  supabaseClient.auth.getSession().then(async ({data:{session}}) => {
+    if(!session) return;
+    // Check the EXISTING session's role directly — calling adminLogin()
+    // here would blindly attempt a fresh sign-in with empty form fields
+    // and fail confusingly, even for a genuine already-logged-in admin.
+    const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+    if(!profile || profile.role !== 'admin'){
+      document.getElementById('aAuthError').textContent = profile
+        ? `This account is registered as a ${profile.role}, not an admin.`
+        : "This account isn't set up as an admin.";
+      await supabaseClient.auth.signOut();
+      return;
+    }
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-overview').classList.add('active');
+    loadEverything();
   });
 }
 </script>
