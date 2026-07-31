@@ -99,6 +99,7 @@
 
   .section-label{font-size:13px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:22px 0 10px;}
 </style>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDaE3929jQWbcZAQjN4d9OHG_DV_TOAWyk&loading=async"></script>
 </head>
 <body>
 
@@ -269,8 +270,11 @@
 
   <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:12px 0;">
     <div style="font-weight:700; margin-bottom:4px;">Store location</div>
-    <div class="meta" style="margin-bottom:10px;">Needed for accurate distance-based delivery pricing. Uses the address field above.</div>
-    <button class="btn" onclick="confirmVdLocation()">Confirm location from address</button>
+    <div class="meta" style="margin-bottom:10px;">Type the address to jump there, then drag the pin to the exact spot — typed addresses alone aren't reliably precise here.</div>
+    <button type="button" class="btn" style="margin-bottom:10px;" onclick="jumpMapToAddress('admin')">Find on map</button>
+    <div id="adminMapPicker" style="height:260px; border-radius:12px; background:#eee;"></div>
+    <div class="meta" style="margin:8px 0;">Drag the red pin if it's not quite right.</div>
+    <button class="btn" onclick="confirmVdLocation()">Save this location</button>
     <div id="vdLocationResult" style="font-size:12.5px; margin-top:8px;"></div>
   </div>
 
@@ -538,6 +542,7 @@ async function viewVendorDetail(id){
   document.getElementById('vdLocationResult').innerHTML = (v.lat != null)
     ? '✅ Location already confirmed.'
     : '⚠️ Not confirmed yet — this store\'s deliveries use the standard fallback fee until it is.';
+  initMapPicker('admin', 'adminMapPicker', v.lat, v.lng);
   document.getElementById('vdDeliveryMinutes').value = v.avg_delivery_minutes || 25;
   document.getElementById('vdOpeningTime').value = v.opening_time || '';
   document.getElementById('vdClosingTime').value = v.closing_time || '';
@@ -573,29 +578,64 @@ async function toggleVendorManualOpen(){
   renderVendorManualOpenToggle(v);
 }
 
-async function confirmVdLocation(){
-  const resultEl = document.getElementById('vdLocationResult');
-  const address = document.getElementById('vdAddress').value.trim();
-  if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Add an address first.</span>'; return; }
-  resultEl.textContent = 'Looking up address…';
+// ---- Map picker: type an address to jump there, then drag the pin to
+// the exact spot. The FINAL PIN POSITION is what gets saved.
+const mapPickers = {};
+const SOKOTO_CENTER = { lat: 13.0059, lng: 5.2476 };
+const mapPickerAddressInputs = { admin: 'vdAddress' };
+
+function waitForGoogleMaps(cb){
+  if(window.google && window.google.maps) cb();
+  else setTimeout(() => waitForGoogleMaps(cb), 200);
+}
+
+function initMapPicker(name, containerId, initialLat, initialLng){
+  waitForGoogleMaps(() => {
+    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : SOKOTO_CENTER;
+    const map = new google.maps.Map(document.getElementById(containerId), {
+      center, zoom: initialLat != null ? 16 : 13, streetViewControl:false, mapTypeControl:false, fullscreenControl:false
+    });
+    const marker = new google.maps.Marker({ position: center, map, draggable: true });
+    mapPickers[name] = { map, marker };
+  });
+}
+
+async function jumpMapToAddress(name){
+  const inputId = mapPickerAddressInputs[name] || 'vendorAddressInput';
+  const address = document.getElementById(inputId).value.trim();
+  if(!address || !mapPickers[name]) return;
   try {
     const resp = await fetch('/api/geocode', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ action: 'geocode', address })
     });
     const result = await resp.json();
-    if(!resp.ok){ resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`; return; }
+    if(!resp.ok) return;
+    const pos = { lat: result.lat, lng: result.lng };
+    mapPickers[name].map.setCenter(pos);
+    mapPickers[name].map.setZoom(16);
+    mapPickers[name].marker.setPosition(pos);
+  } catch(e){ console.error('Map jump failed', e); }
+}
 
-    const { error } = await supabaseClient.from('vendors').update({ lat: result.lat, lng: result.lng }).eq('id', currentDetailVendorId);
-    if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Found it, but saving failed: ${error.message}</span>`; return; }
+function getPickerPosition(name){
+  if(!mapPickers[name]) return null;
+  const pos = mapPickers[name].marker.getPosition();
+  return { lat: pos.lat(), lng: pos.lng() };
+}
 
-    resultEl.innerHTML = `✅ Confirmed: <strong>${result.formattedAddress}</strong>`;
-    const v = allVendorsData.find(x => x.id === currentDetailVendorId);
-    if(v){ v.lat = result.lat; v.lng = result.lng; }
-  } catch(e){
-    resultEl.innerHTML = '<span style="color:var(--red);">Could not look up that address right now — try again.</span>';
-  }
+async function confirmVdLocation(){
+  const resultEl = document.getElementById('vdLocationResult');
+  const address = document.getElementById('vdAddress').value.trim();
+  const pos = getPickerPosition('admin');
+  if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Add an address first.</span>'; return; }
+  if(!pos){ resultEl.innerHTML = '<span style="color:var(--red);">Map isn\'t ready yet — wait a moment and try again.</span>'; return; }
+  resultEl.textContent = 'Saving…';
+  const { error } = await supabaseClient.from('vendors').update({ address, lat: pos.lat, lng: pos.lng }).eq('id', currentDetailVendorId);
+  if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save: ${error.message}</span>`; return; }
+  resultEl.innerHTML = `✅ Location saved.`;
+  const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+  if(v){ v.address = address; v.lat = pos.lat; v.lng = pos.lng; }
 }
 
 function renderVdAccountStatus(v){
