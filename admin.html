@@ -208,16 +208,11 @@
     <select id="riderDedicatedVendor"><option value="">General pool — available for any store's deliveries</option></select>
     <div class="meta" style="margin-top:4px;">If this is a vendor's own delivery person on their own bike, dedicate them here — they'll keep 100% of the delivery fee on that vendor's orders instead of the usual split.</div>
   </div>
-  <div class="field-row">
-    <div class="field">
-      <label>Login email</label>
-      <input type="email" placeholder="rider's email for login" id="riderEmail">
-    </div>
-    <div class="field">
-      <label>Login password</label>
-      <input type="text" placeholder="temporary password" id="riderPassword">
-    </div>
+  <div class="field">
+    <label>Login password</label>
+    <input type="text" placeholder="temporary password" id="riderPassword">
   </div>
+  <div class="meta" style="margin-bottom:10px;">The rider logs in with their phone number (above) and this password — no email needed.</div>
   <div id="riderAddError" style="color:var(--red); font-size:12.5px; margin-bottom:10px;"></div>
   <button class="btn" onclick="addRider()">Add rider</button>
 
@@ -585,7 +580,7 @@ let vdVerifiedAccountName = '';
 async function loadVdBankList(currentBankCode){
   const select = document.getElementById('vdBankCode');
   try {
-    const resp = await fetch('/api/list-banks');
+    const resp = await fetch('/api/bank?action=list');
     const result = await resp.json();
     if(!resp.ok) throw new Error(result.error);
     select.innerHTML = '<option value="">Select bank</option>' +
@@ -610,10 +605,10 @@ async function verifyVdAccount(){
 
   resultEl.textContent = 'Checking…';
   try {
-    const verifyResp = await fetch('/api/verify-bank-account', {
+    const verifyResp = await fetch('/api/bank', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ accountNumber: acctNumber, bankCode })
+      body: JSON.stringify({ action: 'verify', accountNumber: acctNumber, bankCode })
     });
     const verifyResult = await verifyResp.json();
     if(!verifyResp.ok){
@@ -624,10 +619,10 @@ async function verifyVdAccount(){
     // Immediately commit — this is what actually creates the Paystack
     // transfer recipient, the same step vendor signup does at submit time.
     resultEl.textContent = 'Verified — saving…';
-    const recipientResp = await fetch('/api/create-transfer-recipient', {
+    const recipientResp = await fetch('/api/bank', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ recipientType: 'vendor', id: currentDetailVendorId, accountNumber: acctNumber, bankCode })
+      body: JSON.stringify({ action: 'create-recipient', recipientType: 'vendor', id: currentDetailVendorId, accountNumber: acctNumber, bankCode })
     });
     const recipientResult = await recipientResp.json();
     if(!recipientResp.ok){
@@ -811,10 +806,10 @@ async function assignRider(orderId){
 
 async function notifyCustomer(orderId, status){
   try {
-    await fetch('/api/notify-customer', {
+    await fetch('/api/notify', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ orderId, status })
+      body: JSON.stringify({ type: 'customer', orderId, status })
     });
   } catch(e){ console.error('Customer notification failed', e); }
 }
@@ -944,7 +939,7 @@ async function loadRiderBankList(){
   const select = document.getElementById('riderBankCode');
   if(!select) return;
   try {
-    const resp = await fetch('/api/list-banks');
+    const resp = await fetch('/api/bank?action=list');
     const result = await resp.json();
     if(!resp.ok) throw new Error(result.error);
     select.innerHTML = '<option value="">Select bank</option>' +
@@ -968,10 +963,10 @@ async function verifyRiderAccount(){
   if(acctNumber.length !== 10){ resultEl.innerHTML = '<span style="color:var(--red);">Account number should be 10 digits.</span>'; return; }
   resultEl.textContent = 'Checking…';
   try {
-    const resp = await fetch('/api/verify-bank-account', {
+    const resp = await fetch('/api/bank', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ accountNumber: acctNumber, bankCode })
+      body: JSON.stringify({ action: 'verify', accountNumber: acctNumber, bankCode })
     });
     const result = await resp.json();
     if(!resp.ok){
@@ -1014,9 +1009,24 @@ function filterAndRenderRiders(){
     return `
     <div class="rider-row">
       <div><div class="n">${r.full_name}</div><div class="m">${r.vehicle||'—'} · ${r.phone}${r.account_verified ? '' : ' · ⚠️ no verified payout account'}</div></div>
-      <div>${dedicatedTag}<span class="pill ${r.active?'approved':'flag'}" style="margin-left:6px;">${r.active?'Active':'Inactive'}</span></div>
+      <div>${dedicatedTag}<span class="pill ${r.active?'approved':'flag'}" style="margin-left:6px;">${r.active?'Active':'Inactive'}</span>
+        <button onclick="resetRiderPassword('${r.id}','${r.full_name.replace(/'/g,"\\'")}')" style="margin-left:6px;">Reset password</button>
+      </div>
     </div>`;
   }).join('');
+}
+
+async function resetRiderPassword(riderId, riderName){
+  const newPassword = prompt(`New password for ${riderName}:`);
+  if(!newPassword) return;
+  const resp = await fetch('/api/create-rider-account', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action: 'reset-password', riderId, newPassword })
+  });
+  const result = await resp.json();
+  if(!resp.ok){ alert('Could not reset: ' + result.error); return; }
+  alert(`Done — tell ${riderName} their new password: ${newPassword}`);
 }
 async function addRider(){
   const full_name = document.getElementById('riderName').value.trim();
@@ -1025,13 +1035,12 @@ async function addRider(){
   const bankCode = document.getElementById('riderBankCode').value;
   const bank_name = document.getElementById('riderBankCode').selectedOptions[0]?.textContent || '';
   const account_number = document.getElementById('riderAcct').value.trim();
-  const email = document.getElementById('riderEmail').value.trim();
   const password = document.getElementById('riderPassword').value;
   const dedicated_vendor_id = document.getElementById('riderDedicatedVendor').value || null;
   const errEl = document.getElementById('riderAddError');
   errEl.textContent = '';
-  if(!full_name || !phone || !email || !password){
-    errEl.textContent = 'Name, phone, email, and password are all required.';
+  if(!full_name || !phone || !password){
+    errEl.textContent = 'Name, phone, and password are all required.';
     return;
   }
   if(!riderAccountVerified){
@@ -1042,17 +1051,17 @@ async function addRider(){
   const resp = await fetch('/api/create-rider-account', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ email, password, full_name, phone, vehicle, bank_name, account_number, added_by: session.user.id, dedicated_vendor_id })
+    body: JSON.stringify({ password, full_name, phone, vehicle, bank_name, account_number, added_by: session.user.id, dedicated_vendor_id })
   });
   const result = await resp.json();
   if(!resp.ok){ errEl.textContent = result.error || 'Could not create rider account.'; return; }
 
   // Now that the rider row exists, create their verified Paystack recipient
   try {
-    await fetch('/api/create-transfer-recipient', {
+    await fetch('/api/bank', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ recipientType: 'rider', id: result.rider.id, accountNumber: account_number, bankCode })
+      body: JSON.stringify({ action: 'create-recipient', recipientType: 'rider', id: result.rider.id, accountNumber: account_number, bankCode })
     });
   } catch(e){ console.error('Rider recipient creation failed', e); }
 
@@ -1060,7 +1069,6 @@ async function addRider(){
   document.getElementById('riderPhone').value='';
   document.getElementById('riderVehicle').value='';
   document.getElementById('riderAcct').value='';
-  document.getElementById('riderEmail').value='';
   document.getElementById('riderPassword').value='';
   document.getElementById('riderDedicatedVendor').value='';
   resetRiderVerification();
