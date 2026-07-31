@@ -88,18 +88,15 @@
 <!-- AUTH -->
 <section class="screen active" id="screen-auth">
   <div class="step-title">Rider log in</div>
-  <div class="step-sub">Use the email and password Sultini gave you when you were added.</div>
-  <div class="field"><label>Email</label><input type="email" id="rAuthEmail"></div>
+  <div class="step-sub">Use the phone number and password Sultini gave you when you were added.</div>
+  <div class="field"><label>Phone number</label><input type="tel" id="rAuthPhone" placeholder="0803 123 4567"></div>
   <div class="field"><label>Password</label><input type="password" id="rAuthPassword"></div>
   <button class="btn btn-primary" onclick="riderLogin()">Log in</button>
   <button type="button" onclick="showForgotPassword()" style="background:none; border:none; color:var(--ink-soft); font-size:12.5px; text-decoration:underline; margin-top:10px; display:block; width:100%; text-align:center;">Forgot password?</button>
   <div id="rAuthError" style="color:var(--amber); font-size:12.5px; margin-top:10px;"></div>
 
   <div id="forgotPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
-    <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Enter your email and we'll send you a reset link.</div>
-    <div class="field"><input type="email" id="forgotEmail" placeholder="Email"></div>
-    <button class="btn btn-primary" onclick="sendPasswordReset()">Send reset link</button>
-    <div id="forgotPasswordMsg" style="font-size:12.5px; margin-top:8px;"></div>
+    <div style="font-size:13px; color:var(--ink-soft);">Since you log in with your phone number, there's no email to send a reset link to. Message Sultini directly on WhatsApp and we'll reset it for you right away.</div>
   </div>
 
   <div id="resetPasswordForm" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
@@ -150,20 +147,17 @@
 <script>
 let currentRider = null;
 
-function showForgotPassword(){
-  document.getElementById('forgotPasswordForm').style.display = 'block';
+// Riders never see or type an email — this turns their phone number into
+// the login identifier Supabase auth actually needs behind the scenes.
+// Must exactly match the format used when the rider account was created.
+function toRiderLoginEmail(phone){
+  const digits = (phone || '').replace(/\D/g, '');
+  const intl = digits.startsWith('234') ? digits : '234' + digits.replace(/^0/, '');
+  return `${intl}@riders.sultini.internal`;
 }
 
-async function sendPasswordReset(){
-  const email = document.getElementById('forgotEmail').value.trim();
-  const msgEl = document.getElementById('forgotPasswordMsg');
-  if(!email){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = 'Please enter your email.'; return; }
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/rider.html'
-  });
-  if(error){ msgEl.style.color = 'var(--amber)'; msgEl.textContent = error.message; return; }
-  msgEl.style.color = 'var(--green, #4E8B5C)';
-  msgEl.textContent = 'Check your email for a reset link.';
+function showForgotPassword(){
+  document.getElementById('forgotPasswordForm').style.display = 'block';
 }
 
 async function submitNewPassword(){
@@ -187,10 +181,11 @@ supabaseClient.auth.onAuthStateChange((event) => {
 });
 
 async function riderLogin(){
-  const email = document.getElementById('rAuthEmail').value.trim();
+  const phone = document.getElementById('rAuthPhone').value.trim();
   const password = document.getElementById('rAuthPassword').value;
   const errEl = document.getElementById('rAuthError');
   errEl.textContent = '';
+  const email = toRiderLoginEmail(phone);
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error){ errEl.textContent = error.message; return; }
   await afterRiderLogin();
@@ -226,10 +221,25 @@ function switchTab(tab){
 }
 
 async function loadAvailableDeliveries(){
-  const { data: orders } = await supabaseClient
+  // Figure out which vendors have a dedicated rider — their orders are
+  // reserved for that rider specifically, not up for anyone to grab.
+  const { data: dedicatedRows } = await supabaseClient
+    .from('riders').select('dedicated_vendor_id').not('dedicated_vendor_id', 'is', null);
+  const dedicatedVendorIds = (dedicatedRows || []).map(r => r.dedicated_vendor_id);
+
+  const { data: rawOrders } = await supabaseClient
     .from('orders').select('*, vendors(name, address)')
     .eq('status', 'ready').eq('fulfilment', 'delivery').is('rider_id', null)
-    .order('created_at', {ascending:true}).limit(20);
+    .order('created_at', {ascending:true}).limit(40);
+
+  // A dedicated vendor's orders only show up for their own rider; every
+  // other rider only sees orders from vendors with no dedicated rider.
+  const orders = (rawOrders || []).filter(o => {
+    const isReservedForSomeone = dedicatedVendorIds.includes(o.vendor_id);
+    if (!isReservedForSomeone) return true; // open to anyone
+    return o.vendor_id === currentRider.dedicated_vendor_id; // reserved — only their rider sees it
+  }).slice(0, 20);
+
   const el = document.getElementById('availableDeliveryList');
   if(!orders || orders.length === 0){ el.innerHTML = '<div class="empty">No deliveries available right now.</div>'; return; }
   el.innerHTML = orders.map(o => `
