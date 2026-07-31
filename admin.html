@@ -267,6 +267,13 @@
     <button id="vdManualOpenToggle" onclick="toggleVendorManualOpen()" style="border:none; border-radius:20px; padding:10px 16px; font-weight:700; font-size:13px; cursor:pointer;"></button>
   </div>
 
+  <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:12px 0;">
+    <div style="font-weight:700; margin-bottom:4px;">Store location</div>
+    <div class="meta" style="margin-bottom:10px;">Needed for accurate distance-based delivery pricing. Uses the address field above.</div>
+    <button class="btn" onclick="confirmVdLocation()">Confirm location from address</button>
+    <div id="vdLocationResult" style="font-size:12.5px; margin-top:8px;"></div>
+  </div>
+
   <button class="btn" onclick="saveVendorDetail()">Save changes</button>
   <div id="vdSaved" style="font-size:12.5px; margin-top:8px; font-weight:600;"></div>
 
@@ -528,6 +535,9 @@ async function viewVendorDetail(id){
   resetVdVerification();
   loadVdBankList(v.bank_code);
   renderVdAccountStatus(v);
+  document.getElementById('vdLocationResult').innerHTML = (v.lat != null)
+    ? '✅ Location already confirmed.'
+    : '⚠️ Not confirmed yet — this store\'s deliveries use the standard fallback fee until it is.';
   document.getElementById('vdDeliveryMinutes').value = v.avg_delivery_minutes || 25;
   document.getElementById('vdOpeningTime').value = v.opening_time || '';
   document.getElementById('vdClosingTime').value = v.closing_time || '';
@@ -561,6 +571,31 @@ async function toggleVendorManualOpen(){
   if(error){ alert('Could not update: ' + error.message); return; }
   v.is_open = newState;
   renderVendorManualOpenToggle(v);
+}
+
+async function confirmVdLocation(){
+  const resultEl = document.getElementById('vdLocationResult');
+  const address = document.getElementById('vdAddress').value.trim();
+  if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Add an address first.</span>'; return; }
+  resultEl.textContent = 'Looking up address…';
+  try {
+    const resp = await fetch('/api/geocode', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'geocode', address })
+    });
+    const result = await resp.json();
+    if(!resp.ok){ resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`; return; }
+
+    const { error } = await supabaseClient.from('vendors').update({ lat: result.lat, lng: result.lng }).eq('id', currentDetailVendorId);
+    if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Found it, but saving failed: ${error.message}</span>`; return; }
+
+    resultEl.innerHTML = `✅ Confirmed: <strong>${result.formattedAddress}</strong>`;
+    const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+    if(v){ v.lat = result.lat; v.lng = result.lng; }
+  } catch(e){
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not look up that address right now — try again.</span>';
+  }
 }
 
 function renderVdAccountStatus(v){
@@ -1131,9 +1166,6 @@ if(!window.location.hash.includes('type=recovery')){
   });
 }
 </script>
-
-<!-- Vercel Web Analytics -->
-<script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 
 </body>
 </html>
