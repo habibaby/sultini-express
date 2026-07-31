@@ -488,7 +488,7 @@ let verifiedAccountName = '';
 async function loadBankList(){
   const select = document.getElementById('bankCode');
   try {
-    const resp = await fetch('/api/list-banks');
+    const resp = await fetch('/api/bank?action=list');
     const result = await resp.json();
     if(!resp.ok) throw new Error(result.error);
     select.innerHTML = '<option value="">Select your bank</option>' +
@@ -515,10 +515,10 @@ async function verifyVendorAccount(){
 
   resultEl.textContent = 'Checking…';
   try {
-    const resp = await fetch('/api/verify-bank-account', {
+    const resp = await fetch('/api/bank', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ accountNumber: acctNumber, bankCode })
+      body: JSON.stringify({ action: 'verify', accountNumber: acctNumber, bankCode })
     });
     const result = await resp.json();
     if(!resp.ok){
@@ -620,10 +620,10 @@ async function submitRegistration(){
   // Create the real Paystack transfer recipient now that we have a vendor id.
   // This re-verifies server-side too, so this is never trusting the browser alone.
   try {
-    const recipientResp = await fetch('/api/create-transfer-recipient', {
+    const recipientResp = await fetch('/api/bank', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ recipientType: 'vendor', id: vendor.id, accountNumber: acctNumber, bankCode })
+      body: JSON.stringify({ action: 'create-recipient', recipientType: 'vendor', id: vendor.id, accountNumber: acctNumber, bankCode })
     });
     if(!recipientResp.ok){
       const r = await recipientResp.json();
@@ -653,10 +653,10 @@ async function submitRegistration(){
 
 async function notifyAdmin(subject, message){
   try {
-    await fetch('/api/notify-admin', {
+    await fetch('/api/notify', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ subject, message })
+      body: JSON.stringify({ type: 'admin', subject, message })
     });
   } catch(e){ console.error('Notification failed', e); }
 }
@@ -835,10 +835,10 @@ async function updateOrderStatus(orderId, status, pickupCode, fulfilment){
     notifyAdmin('Order ready', `Order ${pickupCode || orderId} is marked ready.`);
     if(fulfilment === 'delivery'){
       try {
-        await fetch('/api/notify-riders-new-delivery', {
+        await fetch('/api/notify', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ pickupCode })
+          body: JSON.stringify({ type: 'riders_new_delivery', pickupCode })
         });
       } catch(e){ console.error('Rider notification failed', e); }
     }
@@ -848,10 +848,10 @@ async function updateOrderStatus(orderId, status, pickupCode, fulfilment){
 
 async function notifyCustomer(orderId, status){
   try {
-    await fetch('/api/notify-customer', {
+    await fetch('/api/notify', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ orderId, status })
+      body: JSON.stringify({ type: 'customer', orderId, status })
     });
   } catch(e){ console.error('Customer notification failed', e); }
 }
