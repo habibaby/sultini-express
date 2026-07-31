@@ -751,11 +751,11 @@ async function markDelivered(orderId, vendorId, deliveryFee){
 // ---- Payouts ----
 async function loadPayouts(){
   const { data: entries } = await supabaseClient
-    .from('ledger_entries').select('*, vendors(name, account_verified), riders(full_name, account_verified)')
-    .in('status', ['available','cashout_requested','in_dispute_window','held','processing','transfer_failed'])
+    .from('ledger_entries_effective').select('*, vendors(name, account_verified), riders(full_name, account_verified), orders(status, fulfilment, pickup_code)')
+    .in('effective_status', ['available','cashout_requested','in_dispute_window','held','processing','transfer_failed','awaiting_fulfillment_confirmation'])
     .order('created_at', {ascending:false}).limit(30);
 
-  const actionable = (entries||[]).filter(e => e.status==='available' || e.status==='cashout_requested' || e.status==='transfer_failed').length;
+  const actionable = (entries||[]).filter(e => e.effective_status==='available' || e.effective_status==='cashout_requested' || e.effective_status==='transfer_failed').length;
   const payoutsBadge = document.getElementById('payoutsNavBadge');
   if(actionable > 0){ payoutsBadge.dataset.n = actionable; payoutsBadge.classList.add('badge-dot'); }
   else { payoutsBadge.classList.remove('badge-dot'); }
@@ -766,17 +766,24 @@ async function loadPayouts(){
     const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
     const verified = e.recipient_type==='vendor' ? e.vendors?.account_verified : e.riders?.account_verified;
 
-    if(e.status==='held'){
+    if(e.effective_status==='held'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ Held — customer dispute open</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
       <div class="row-actions"><button onclick="go('disputes')">Review dispute</button><button class="primary" onclick="setLedgerStatus('${e.id}','available')">Release hold</button></div></div>`;
     }
-    if(e.status==='in_dispute_window'){
+    if(e.effective_status==='in_dispute_window'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Still in dispute window</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
     }
-    if(e.status==='processing'){
+    if(e.effective_status==='awaiting_fulfillment_confirmation'){
+      const orderInfo = e.orders?.fulfilment==='pickup'
+        ? `waiting for the vendor to confirm the customer's pickup code (order ${e.orders?.pickup_code||''})`
+        : `waiting for the order to be confirmed delivered`;
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⏸ Dispute window passed, but still ${orderInfo}</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="meta" style="margin-top:4px;">Money is intentionally held — this is not a bug. It'll become payable automatically once fulfillment is confirmed.</div></div>`;
+    }
+    if(e.effective_status==='processing'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⏳ Sent to Paystack, awaiting confirmation</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
     }
-    if(e.status==='transfer_failed'){
+    if(e.effective_status==='transfer_failed'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ❌ Transfer failed: ${e.failure_reason||'unknown reason'}</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
       <div class="row-actions"><button class="primary" onclick="payOut('${e.id}')">Retry payout</button></div></div>`;
     }
@@ -784,7 +791,7 @@ async function loadPayouts(){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ No verified payout account — cannot pay out yet</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
     }
     return `<div class="card">
-      <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Dispute window clear</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Ready to pay</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div>
       <div class="row-actions">
         <button class="danger" onclick="setLedgerStatus('${e.id}','held')">Hold</button>
         <button class="primary" onclick="payOut('${e.id}')">Pay out via Paystack</button>
