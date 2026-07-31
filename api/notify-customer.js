@@ -29,6 +29,10 @@ const STATUS_MESSAGES = {
     subject: 'Your order has been delivered',
     text: (code) => `Order ${code} has been marked as delivered. Enjoy! If anything was wrong, you can report a problem from your account page.`,
   },
+  completed: {
+    subject: 'Thanks for picking up your order!',
+    text: (code) => `Order ${code} has been confirmed picked up. Enjoy! If anything was wrong, you can report a problem from your account page.`,
+  },
 };
 
 export default async function handler(req, res) {
