@@ -322,6 +322,13 @@
     <div id="storeHoursSaved" style="font-size:12.5px; margin-top:6px; font-weight:600;"></div>
   </div>
 
+  <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:14px 0;">
+    <div style="font-weight:700; margin-bottom:4px;">Store location</div>
+    <div class="note" style="margin-bottom:10px;">Confirm your exact location so delivery fees are calculated by real distance, not a flat guess. Uses the address from your profile — add a nearby landmark if it doesn't resolve correctly.</div>
+    <button class="btn" onclick="confirmStoreLocation()">Confirm my location</button>
+    <div id="locationConfirmResult" style="font-size:12.5px; margin-top:8px;"></div>
+  </div>
+
   <!-- ORDERS TAB -->
   <div id="tab-orders">
     <div class="note">Loading orders…</div>
@@ -719,6 +726,9 @@ async function goDashboard(){
   document.getElementById('dashboardStorePhoto').src = currentVendor.cover_image_url || '';
   document.getElementById('vendorOpeningTime').value = currentVendor.opening_time || '';
   document.getElementById('vendorClosingTime').value = currentVendor.closing_time || '';
+  document.getElementById('locationConfirmResult').innerHTML = (currentVendor.lat != null)
+    ? '✅ Location already confirmed — press again if your store has moved.'
+    : '⚠️ Not confirmed yet — delivery fees for your store are using the standard fallback until this is done.';
   renderManualOpenToggle();
   await loadOrders();
   await loadMenu();
@@ -744,6 +754,29 @@ async function toggleManualOpen(){
   if(error){ alert('Could not update: ' + error.message); return; }
   currentVendor.is_open = newState;
   renderManualOpenToggle();
+}
+
+async function confirmStoreLocation(){
+  const resultEl = document.getElementById('locationConfirmResult');
+  if(!currentVendor.address){ resultEl.innerHTML = '<span style="color:var(--red);">Add your address in the store details first.</span>'; return; }
+  resultEl.textContent = 'Looking up your address…';
+  try {
+    const resp = await fetch('/api/geocode', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'geocode', address: currentVendor.address })
+    });
+    const result = await resp.json();
+    if(!resp.ok){ resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`; return; }
+
+    const { error } = await supabaseClient.from('vendors').update({ lat: result.lat, lng: result.lng }).eq('id', currentVendor.id);
+    if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Found it, but saving failed: ${error.message}</span>`; return; }
+
+    currentVendor.lat = result.lat; currentVendor.lng = result.lng;
+    resultEl.innerHTML = `✅ Location confirmed: <strong>${result.formattedAddress}</strong>`;
+  } catch(e){
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not look up your address right now — try again.</span>';
+  }
 }
 
 async function saveStoreHours(){
@@ -1038,9 +1071,5 @@ if(!window.location.hash.includes('type=recovery')){
   supabaseClient.auth.getSession().then(({data:{session}}) => { if(session) afterLogin(); });
 }
 </script>
-
-<!-- Vercel Web Analytics -->
-<script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
-
 </body>
 </html>
