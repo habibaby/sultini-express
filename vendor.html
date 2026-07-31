@@ -296,10 +296,13 @@
       <img id="dashboardStorePhoto" src="" alt="" style="width:52px; height:52px; border-radius:12px; object-fit:cover; background:var(--stone);">
       <input type="file" accept="image/*" style="display:none;" onchange="changeStorePhoto(this)">
     </label>
-    <div>
+    <div style="flex:1;">
       <div class="step-title" style="margin:0;">Musa's Kitchen</div>
       <div class="step-sub" style="margin:0;">Your vendor dashboard</div>
     </div>
+    <button id="manualOpenToggle" onclick="toggleManualOpen()" style="border:none; border-radius:20px; padding:10px 16px; font-weight:700; font-size:13px; cursor:pointer;">
+      ● Open
+    </button>
   </div>
 
   <div class="tabs">
@@ -688,10 +691,31 @@ async function goDashboard(){
   document.getElementById('dashboardStorePhoto').src = currentVendor.cover_image_url || '';
   document.getElementById('vendorOpeningTime').value = currentVendor.opening_time || '';
   document.getElementById('vendorClosingTime').value = currentVendor.closing_time || '';
+  renderManualOpenToggle();
   await loadOrders();
   await loadMenu();
   await loadEarnings();
   window.scrollTo(0,0);
+}
+
+function renderManualOpenToggle(){
+  const btn = document.getElementById('manualOpenToggle');
+  const isOpen = currentVendor.is_open !== false; // default to open if never set
+  btn.textContent = isOpen ? '● Open' : '● Closed';
+  btn.style.background = isOpen ? '#DCEFE1' : '#F4C2C2';
+  btn.style.color = isOpen ? '#1F5D3A' : '#7A2E2E';
+}
+
+async function toggleManualOpen(){
+  const newState = !(currentVendor.is_open !== false);
+  const confirmMsg = newState
+    ? 'Reopen your store? Customers will be able to order again right away.'
+    : 'Close your store right now? Customers won\'t be able to order from you until you reopen, even during your normal hours.';
+  if(!confirm(confirmMsg)) return;
+  const { error } = await supabaseClient.from('vendors').update({ is_open: newState }).eq('id', currentVendor.id);
+  if(error){ alert('Could not update: ' + error.message); return; }
+  currentVendor.is_open = newState;
+  renderManualOpenToggle();
 }
 
 async function saveStoreHours(){
