@@ -135,6 +135,7 @@
 
   .note{font-size:12px; color:var(--ink-soft); background:rgba(107,80,88,0.06); border-radius:10px; padding:10px 12px; margin:12px 0;}
 </style>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDaE3929jQWbcZAQjN4d9OHG_DV_TOAWyk&loading=async"></script>
 </head>
 <body>
 
@@ -324,12 +325,15 @@
 
   <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:14px 0;">
     <div style="font-weight:700; margin-bottom:4px;">Store location</div>
-    <div class="note" style="margin-bottom:10px;">Confirm your exact location so delivery fees are calculated by real distance, not a flat guess. Fix your address below if it's wrong, then confirm — add a nearby landmark if it doesn't resolve correctly.</div>
+    <div class="note" style="margin-bottom:10px;">Type your address to jump there, then drag the pin to your exact spot — typed addresses alone aren't always precise here.</div>
     <div class="field">
       <label>Address</label>
-      <input type="text" id="vendorAddressInput" placeholder="e.g. 12 Runjin Sambo Road, Sokoto">
+      <input type="text" id="vendorAddressInput" placeholder="e.g. 12 Runjin Sambo Road, Sokoto" onkeydown="if(event.key==='Enter'){event.preventDefault(); jumpMapToAddress('vendor');}">
     </div>
-    <button class="btn" onclick="confirmStoreLocation()">Save address & confirm location</button>
+    <button type="button" class="btn" style="margin-bottom:10px;" onclick="jumpMapToAddress('vendor')">Find on map</button>
+    <div id="vendorMapPicker" style="height:260px; border-radius:12px; background:#eee;"></div>
+    <div class="note" style="margin:8px 0;">Drag the red pin if it's not quite right.</div>
+    <button class="btn" onclick="confirmStoreLocation()">Save this location</button>
     <div id="locationConfirmResult" style="font-size:12.5px; margin-top:8px;"></div>
   </div>
 
@@ -732,8 +736,9 @@ async function goDashboard(){
   document.getElementById('vendorClosingTime').value = currentVendor.closing_time || '';
   document.getElementById('vendorAddressInput').value = currentVendor.address || '';
   document.getElementById('locationConfirmResult').innerHTML = (currentVendor.lat != null)
-    ? '✅ Location already confirmed — press again if your store has moved.'
+    ? '✅ Location already confirmed — drag the pin and save again if your store has moved.'
     : '⚠️ Not confirmed yet — delivery fees for your store are using the standard fallback until this is done.';
+  initMapPicker('vendor', 'vendorMapPicker', currentVendor.lat, currentVendor.lng);
   renderManualOpenToggle();
   await loadOrders();
   await loadMenu();
@@ -761,34 +766,63 @@ async function toggleManualOpen(){
   renderManualOpenToggle();
 }
 
-async function confirmStoreLocation(){
-  const resultEl = document.getElementById('locationConfirmResult');
-  const address = document.getElementById('vendorAddressInput').value.trim();
-  if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Enter your store address first.</span>'; return; }
-  resultEl.textContent = 'Saving address and looking it up…';
-  try {
-    // Save the corrected address first — this was the actual missing piece,
-    // there was previously no way to fix it after initial signup.
-    const { error: addrError } = await supabaseClient.from('vendors').update({ address }).eq('id', currentVendor.id);
-    if(addrError){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save address: ${addrError.message}</span>`; return; }
-    currentVendor.address = address;
+// ---- Map picker: type an address to jump there, then drag the pin to
+// the exact spot. The FINAL PIN POSITION is what gets saved — typed
+// addresses alone aren't reliably precise in Sokoto, so this is the
+// actual source of truth, not just a starting point.
+const mapPickers = {};
+const SOKOTO_CENTER = { lat: 13.0059, lng: 5.2476 };
 
+function waitForGoogleMaps(cb){
+  if(window.google && window.google.maps) cb();
+  else setTimeout(() => waitForGoogleMaps(cb), 200);
+}
+
+function initMapPicker(name, containerId, initialLat, initialLng){
+  waitForGoogleMaps(() => {
+    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : SOKOTO_CENTER;
+    const map = new google.maps.Map(document.getElementById(containerId), {
+      center, zoom: initialLat != null ? 16 : 13, streetViewControl:false, mapTypeControl:false, fullscreenControl:false
+    });
+    const marker = new google.maps.Marker({ position: center, map, draggable: true });
+    mapPickers[name] = { map, marker };
+  });
+}
+
+async function jumpMapToAddress(name){
+  const address = document.getElementById('vendorAddressInput').value.trim();
+  if(!address || !mapPickers[name]) return;
+  try {
     const resp = await fetch('/api/geocode', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ action: 'geocode', address })
     });
     const result = await resp.json();
-    if(!resp.ok){ resultEl.innerHTML = `<span style="color:var(--red);">${result.error}</span>`; return; }
+    if(!resp.ok) return;
+    const pos = { lat: result.lat, lng: result.lng };
+    mapPickers[name].map.setCenter(pos);
+    mapPickers[name].map.setZoom(16);
+    mapPickers[name].marker.setPosition(pos);
+  } catch(e){ console.error('Map jump failed', e); }
+}
 
-    const { error } = await supabaseClient.from('vendors').update({ lat: result.lat, lng: result.lng }).eq('id', currentVendor.id);
-    if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Found it, but saving failed: ${error.message}</span>`; return; }
+function getPickerPosition(name){
+  if(!mapPickers[name]) return null;
+  const pos = mapPickers[name].marker.getPosition();
+  return { lat: pos.lat(), lng: pos.lng() };
+}
 
-    currentVendor.lat = result.lat; currentVendor.lng = result.lng;
-    resultEl.innerHTML = `✅ Location confirmed: <strong>${result.formattedAddress}</strong> — if this still isn't right, edit the address above and confirm again.`;
-  } catch(e){
-    resultEl.innerHTML = '<span style="color:var(--red);">Could not look up your address right now — try again.</span>';
-  }
+async function confirmStoreLocation(){
+  const resultEl = document.getElementById('locationConfirmResult');
+  const address = document.getElementById('vendorAddressInput').value.trim();
+  const pos = getPickerPosition('vendor');
+  if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Enter your store address first.</span>'; return; }
+  if(!pos){ resultEl.innerHTML = '<span style="color:var(--red);">Map isn\'t ready yet — wait a moment and try again.</span>'; return; }
+  resultEl.textContent = 'Saving…';
+  const { error } = await supabaseClient.from('vendors').update({ address, lat: pos.lat, lng: pos.lng }).eq('id', currentVendor.id);
+  if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save: ${error.message}</span>`; return; }
+  currentVendor.address = address; currentVendor.lat = pos.lat; currentVendor.lng = pos.lng;
+  resultEl.innerHTML = `✅ Location saved.`;
 }
 
 async function saveStoreHours(){
