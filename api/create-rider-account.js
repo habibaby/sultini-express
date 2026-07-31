@@ -11,10 +11,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, password, full_name, phone, vehicle, bank_name, account_number, added_by, dedicated_vendor_id } = req.body;
-  if (!email || !password || !full_name || !phone) {
+  const { password, full_name, phone, vehicle, bank_name, account_number, added_by, dedicated_vendor_id } = req.body;
+  if (!password || !full_name || !phone) {
     return res.status(400).json({ error: 'Missing required rider details' });
   }
+
+  // Riders log in with their phone number — this builds the login
+  // identifier Supabase auth needs behind the scenes. Must exactly match
+  // the format rider.html uses when logging in.
+  const digits = phone.replace(/\D/g, '');
+  const intl = digits.startsWith('234') ? digits : '234' + digits.replace(/^0/, '');
+  const email = `${intl}@riders.sultini.internal`;
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
