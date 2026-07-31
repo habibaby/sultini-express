@@ -248,11 +248,15 @@
     <div class="field"><label>WhatsApp</label><input type="text" id="vdWhatsapp"></div>
   </div>
   <div class="field"><label>Address</label><input type="text" id="vdAddress"></div>
-  <div class="field"><label>Bank name</label><input type="text" id="vdBankName"></div>
+
   <div class="field-row">
-    <div class="field"><label>Account number</label><input type="text" id="vdAcctNumber"></div>
-    <div class="field"><label>Account name</label><input type="text" id="vdAcctName"></div>
+    <div class="field"><label>Bank</label><select id="vdBankCode"><option value="">Loading banks…</option></select></div>
+    <div class="field"><label>Account number</label><input type="text" id="vdAcctNumber" maxlength="10" oninput="resetVdVerification()"></div>
   </div>
+  <button type="button" class="btn" id="vdVerifyBtn" onclick="verifyVdAccount()" style="margin-bottom:6px;">Verify account</button>
+  <div id="vdVerifyResult" style="margin-bottom:10px; font-size:13px;"></div>
+  <div id="vdAccountStatus" class="meta" style="margin-bottom:10px;"></div>
+
   <div class="field"><label>Typical prep + delivery time (minutes)</label><input type="number" id="vdDeliveryMinutes"></div>
   <div class="field-row">
     <div class="field"><label>Opening time</label><input type="time" id="vdOpeningTime"></div>
@@ -525,9 +529,10 @@ async function viewVendorDetail(id){
   document.getElementById('vdPhone').value = v.phone || '';
   document.getElementById('vdWhatsapp').value = v.whatsapp || '';
   document.getElementById('vdAddress').value = v.address || '';
-  document.getElementById('vdBankName').value = v.bank_name || '';
   document.getElementById('vdAcctNumber').value = v.account_number || '';
-  document.getElementById('vdAcctName').value = v.account_name || '';
+  resetVdVerification();
+  loadVdBankList(v.bank_code);
+  renderVdAccountStatus(v);
   document.getElementById('vdDeliveryMinutes').value = v.avg_delivery_minutes || 25;
   document.getElementById('vdOpeningTime').value = v.opening_time || '';
   document.getElementById('vdClosingTime').value = v.closing_time || '';
@@ -563,6 +568,85 @@ async function toggleVendorManualOpen(){
   renderVendorManualOpenToggle(v);
 }
 
+function renderVdAccountStatus(v){
+  const el = document.getElementById('vdAccountStatus');
+  if(v.account_verified && v.account_name){
+    el.innerHTML = `✅ Verified: <strong>${v.account_name}</strong>`;
+    el.style.color = 'var(--green)';
+  } else {
+    el.innerHTML = `⚠️ No verified payout account yet — this vendor cannot be paid until verified below.`;
+    el.style.color = 'var(--red)';
+  }
+}
+
+let vdAccountVerified = false;
+let vdVerifiedAccountName = '';
+
+async function loadVdBankList(currentBankCode){
+  const select = document.getElementById('vdBankCode');
+  try {
+    const resp = await fetch('/api/list-banks');
+    const result = await resp.json();
+    if(!resp.ok) throw new Error(result.error);
+    select.innerHTML = '<option value="">Select bank</option>' +
+      result.banks.map(b => `<option value="${b.code}" ${b.code===currentBankCode?'selected':''}>${b.name}</option>`).join('');
+  } catch(e){
+    select.innerHTML = `<option value="">${e.message || 'Could not load banks'}</option>`;
+  }
+}
+
+function resetVdVerification(){
+  vdAccountVerified = false;
+  vdVerifiedAccountName = '';
+  document.getElementById('vdVerifyResult').textContent = '';
+}
+
+async function verifyVdAccount(){
+  const bankCode = document.getElementById('vdBankCode').value;
+  const acctNumber = document.getElementById('vdAcctNumber').value.trim();
+  const resultEl = document.getElementById('vdVerifyResult');
+  if(!bankCode){ resultEl.innerHTML = '<span style="color:var(--red);">Choose a bank first.</span>'; return; }
+  if(acctNumber.length !== 10){ resultEl.innerHTML = '<span style="color:var(--red);">Account number should be 10 digits.</span>'; return; }
+
+  resultEl.textContent = 'Checking…';
+  try {
+    const verifyResp = await fetch('/api/verify-bank-account', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ accountNumber: acctNumber, bankCode })
+    });
+    const verifyResult = await verifyResp.json();
+    if(!verifyResp.ok){
+      resultEl.innerHTML = `<span style="color:var(--red);">${verifyResult.error}</span>`;
+      return;
+    }
+
+    // Immediately commit — this is what actually creates the Paystack
+    // transfer recipient, the same step vendor signup does at submit time.
+    resultEl.textContent = 'Verified — saving…';
+    const recipientResp = await fetch('/api/create-transfer-recipient', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ recipientType: 'vendor', id: currentDetailVendorId, accountNumber: acctNumber, bankCode })
+    });
+    const recipientResult = await recipientResp.json();
+    if(!recipientResp.ok){
+      resultEl.innerHTML = `<span style="color:var(--red);">Verified as ${verifyResult.accountName}, but saving failed: ${recipientResult.error}</span>`;
+      return;
+    }
+
+    vdAccountVerified = true;
+    vdVerifiedAccountName = recipientResult.accountName;
+    resultEl.innerHTML = `✅ Verified and saved: <strong>${recipientResult.accountName}</strong>`;
+
+    // Reflect the update in memory so the status line and vendor list are correct without a full reload
+    const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+    if(v){ v.account_verified = true; v.account_name = recipientResult.accountName; v.bank_code = bankCode; renderVdAccountStatus(v); }
+  } catch(e){
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not verify right now — try again.</span>';
+  }
+}
+
 function safeFileName(originalName){
   const extMatch = originalName.match(/\.[a-zA-Z0-9]+$/);
   const ext = extMatch ? extMatch[0].toLowerCase() : '.jpg';
@@ -588,9 +672,6 @@ async function saveVendorDetail(){
     phone: document.getElementById('vdPhone').value.trim(),
     whatsapp: document.getElementById('vdWhatsapp').value.trim(),
     address: document.getElementById('vdAddress').value.trim(),
-    bank_name: document.getElementById('vdBankName').value.trim(),
-    account_number: document.getElementById('vdAcctNumber').value.trim(),
-    account_name: document.getElementById('vdAcctName').value.trim(),
     avg_delivery_minutes: Number(document.getElementById('vdDeliveryMinutes').value) || 25,
     opening_time: document.getElementById('vdOpeningTime').value || null,
     closing_time: document.getElementById('vdClosingTime').value || null,
