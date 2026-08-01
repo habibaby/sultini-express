@@ -17,9 +17,57 @@ export default async function handler(req, res) {
   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sbHeaders = { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` };
+  const sbGet = (path) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: sbHeaders }).then(r => r.json());
 
   try {
-    // ---- Step 1: actually charge the saved card ----
+    // ---- Step 0: compute the REAL total server-side, before charging
+    // anything. Unlike the popup flow (where the customer already paid a
+    // specific amount before we see it), here WE choose what to charge —
+    // so we just always charge the real, verified amount. The client's
+    // numbers are never used for money, only as a starting point.
+    const itemIds = order.items.map(i => i.menuItemId);
+    const realItems = await sbGet(`menu_items?id=in.(${itemIds.join(',')})&select=id,price,promo_price,in_stock`);
+    const realItemsById = Object.fromEntries(realItems.map(i => [i.id, i]));
+
+    let realSubtotal = 0;
+    for (const orderedItem of order.items) {
+      const real = realItemsById[orderedItem.menuItemId];
+      if (!real) return res.status(400).json({ error: 'One of the items in your cart no longer exists — please refresh and try again.' });
+      if (!real.in_stock) return res.status(400).json({ error: 'One of the items in your cart just went out of stock — please refresh and try again.' });
+      const realPrice = (real.promo_price != null && Number(real.promo_price) < Number(real.price)) ? Number(real.promo_price) : Number(real.price);
+      realSubtotal += realPrice * orderedItem.qty;
+    }
+
+    let realDeliveryFee = 0;
+    if (order.fulfilment === 'delivery') {
+      const vendors = await sbGet(`vendors?id=eq.${order.vendorId}&select=lat,lng`);
+      const vendor = vendors && vendors[0];
+
+      if (vendor && vendor.lat != null && vendor.lng != null && order.deliveryLat != null && order.deliveryLng != null) {
+        const settings = await sbGet(`platform_settings?key=in.(delivery_base_fee,delivery_per_km_rate,delivery_min_fee,delivery_max_fee)&select=key,value`);
+        const get = (key, fallback) => Number((settings.find(s => s.key === key) || {}).value ?? fallback);
+        const R = 6371;
+        const dLat = (order.deliveryLat - vendor.lat) * Math.PI / 180;
+        const dLng = (order.deliveryLng - vendor.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(vendor.lat * Math.PI / 180) * Math.cos(order.deliveryLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        realDeliveryFee = Math.round(get('delivery_base_fee', 800) + distanceKm * get('delivery_per_km_rate', 120));
+        realDeliveryFee = Math.max(get('delivery_min_fee', 1000), Math.min(get('delivery_max_fee', 3500), realDeliveryFee));
+      } else {
+        const fallback = await sbGet(`platform_settings?key=eq.delivery_fee&select=value`);
+        realDeliveryFee = Number((fallback[0] || {}).value ?? 1500);
+      }
+    }
+
+    const realTotal = realSubtotal + realDeliveryFee;
+    // Overwrite whatever the client sent — everything downstream (the
+    // charge, the saved order record) now uses only these verified numbers.
+    order.subtotal = realSubtotal;
+    order.deliveryFee = realDeliveryFee;
+    order.total = realTotal;
+
+    // ---- Step 1: actually charge the saved card, for the real amount ----
     const chargeRes = await fetch('https://api.paystack.co/transaction/charge_authorization', {
       method: 'POST',
       headers: {
@@ -29,7 +77,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         authorization_code: authorizationCode,
         email,
-        amount: Math.round(order.total * 100),
+        amount: Math.round(realTotal * 100),
         currency: 'NGN',
       }),
     });
@@ -37,39 +85,6 @@ export default async function handler(req, res) {
 
     if (!chargeData.status || chargeData.data.status !== 'success') {
       return res.status(400).json({ error: chargeData.data?.gateway_response || 'Card charge failed' });
-    }
-
-    // ---- Step 1b: recompute the delivery fee ourselves — same check as
-    // the regular checkout path, so this payment method can't be used to
-    // bypass real distance-based pricing.
-    if (order.fulfilment === 'delivery') {
-      const sbCheck = (path) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-        headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-      }).then(r => r.json());
-
-      const vendors = await sbCheck(`vendors?id=eq.${order.vendorId}&select=lat,lng`);
-      const vendor = vendors && vendors[0];
-      let expectedFee;
-
-      if (vendor && vendor.lat != null && vendor.lng != null && order.deliveryLat != null && order.deliveryLng != null) {
-        const settings = await sbCheck(`platform_settings?key=in.(delivery_base_fee,delivery_per_km_rate,delivery_min_fee,delivery_max_fee)&select=key,value`);
-        const get = (key, fallback) => Number((settings.find(s => s.key === key) || {}).value ?? fallback);
-        const R = 6371;
-        const dLat = (order.deliveryLat - vendor.lat) * Math.PI / 180;
-        const dLng = (order.deliveryLng - vendor.lng) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(vendor.lat * Math.PI / 180) * Math.cos(order.deliveryLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-        const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        expectedFee = Math.round(get('delivery_base_fee', 800) + distanceKm * get('delivery_per_km_rate', 120));
-        expectedFee = Math.max(get('delivery_min_fee', 1000), Math.min(get('delivery_max_fee', 3500), expectedFee));
-      } else {
-        const fallback = await sbCheck(`platform_settings?key=eq.delivery_fee&select=value`);
-        expectedFee = Number((fallback[0] || {}).value ?? 1500);
-      }
-
-      if (Math.abs(Number(order.deliveryFee) - expectedFee) > 1) {
-        console.error(`Delivery fee mismatch (saved card): client sent ${order.deliveryFee}, expected ${expectedFee}`);
-        return res.status(400).json({ error: 'Delivery fee does not match — please refresh and try again.' });
-      }
     }
 
     // ---- Step 2: write the order to Supabase, same as a normal payment ----
