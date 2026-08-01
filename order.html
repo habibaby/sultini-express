@@ -803,6 +803,7 @@ async function loadStores(){
       address: v.address || null,
       menu: items.map(m => ({
         id: m.id, name: m.name, desc: m.description, price: Number(m.price),
+        promoPrice: m.promo_price != null ? Number(m.promo_price) : null,
         img: m.photo_url, inStock: m.in_stock
       }))
     };
@@ -924,13 +925,16 @@ function renderMenuItem(item){
     : qty === 0
       ? `<button class="add-btn" onclick="addToCart('${item.id}')">＋</button>`
       : `<div class="qty-control"><button onclick="changeQty('${item.id}',-1)">−</button><span>${qty}</span><button onclick="changeQty('${item.id}',1)">＋</button></div>`;
+  const priceDisplay = item.promoPrice != null
+    ? `<div class="price"><span style="text-decoration:line-through; color:var(--ink-soft); font-weight:400; font-size:12px;">₦${item.price.toLocaleString()}</span> ₦${item.promoPrice.toLocaleString()} <span style="background:var(--rose-deep); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:8px; vertical-align:middle;">PROMO</span></div>`
+    : `<div class="price">₦${item.price.toLocaleString()}</div>`;
   return `
     <div class="menu-item">
       <img src="${item.img}" alt="${item.name}">
       <div class="menu-item-body">
         <h4>${item.name}</h4>
         <div class="desc">${item.desc || ''}</div>
-        <div class="price">₦${item.price.toLocaleString()}</div>
+        ${priceDisplay}
         <span class="stock-badge ${item.inStock?'in':'out'}">${item.inStock?'In stock':'Out of stock'}</span>
       </div>
       ${control}
@@ -959,9 +963,12 @@ function changeQty(itemId, delta){
   renderMenu();
   refreshCartBar();
 }
+function effectivePrice(item){
+  return (item.promoPrice != null && item.promoPrice < item.price) ? item.promoPrice : item.price;
+}
 function cartTotals(){
   let count=0, subtotal=0;
-  Object.values(cart).forEach(c=>{ count+=c.qty; subtotal += c.qty*c.item.price; });
+  Object.values(cart).forEach(c=>{ count+=c.qty; subtotal += c.qty*effectivePrice(c.item); });
   return {count, subtotal};
 }
 function refreshCartBar(){
@@ -990,7 +997,7 @@ function renderCartScreen(){
   el.innerHTML = entries.map(c=>`
     <div class="cart-item">
       <img src="${c.item.img}" alt="${c.item.name}">
-      <div class="cart-item-body"><h4>${c.item.name}</h4><div class="price">₦${c.item.price.toLocaleString()} · ${c.store.name}</div></div>
+      <div class="cart-item-body"><h4>${c.item.name}</h4><div class="price">₦${effectivePrice(c.item).toLocaleString()} · ${c.store.name}</div></div>
       <div class="qty-control"><button onclick="changeQty('${c.item.id}',-1); renderCartScreen();">−</button><span>${c.qty}</span><button onclick="changeQty('${c.item.id}',1); renderCartScreen();">＋</button></div>
     </div>`).join('');
 }
@@ -1158,7 +1165,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   const orderPayload = {
     vendorId,
     customerId: session ? session.user.id : null,
-    items: Object.values(cart).map(c => ({ menuItemId: c.item.id, qty: c.qty, price: c.item.price })),
+    items: Object.values(cart).map(c => ({ menuItemId: c.item.id, qty: c.qty, price: effectivePrice(c.item) })),
     fulfilment,
     deliveryFee,
     subtotal,
