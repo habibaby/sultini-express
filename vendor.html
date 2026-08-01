@@ -349,6 +349,7 @@
     <div id="newItemForm" style="display:none; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px;">
       <div class="field"><label>Item name</label><input type="text" id="newItemName"></div>
       <div class="field"><label>Price (₦)</label><input type="text" id="newItemPrice"></div>
+      <div class="field"><label>Promo price (₦) — optional, leave blank for no promo</label><input type="text" id="newItemPromoPrice" placeholder="e.g. 800 if the price is ₦1,000"></div>
       <div class="field">
         <label>Photo</label>
         <label class="photo-upload" style="cursor:pointer; width:100%; height:90px; border-radius:12px;">
@@ -819,10 +820,14 @@ async function confirmStoreLocation(){
   if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Enter your store address first.</span>'; return; }
   if(!pos){ resultEl.innerHTML = '<span style="color:var(--red);">Map isn\'t ready yet — wait a moment and try again.</span>'; return; }
   resultEl.textContent = 'Saving…';
-  const { error } = await supabaseClient.from('vendors').update({ address, lat: pos.lat, lng: pos.lng }).eq('id', currentVendor.id);
-  if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save: ${error.message}</span>`; return; }
-  currentVendor.address = address; currentVendor.lat = pos.lat; currentVendor.lng = pos.lng;
-  resultEl.innerHTML = `✅ Location saved.`;
+  try {
+    const { error } = await supabaseClient.from('vendors').update({ address, lat: pos.lat, lng: pos.lng }).eq('id', currentVendor.id);
+    if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save: ${error.message}</span>`; return; }
+    currentVendor.address = address; currentVendor.lat = pos.lat; currentVendor.lng = pos.lng;
+    resultEl.innerHTML = `✅ Location saved.`;
+  } catch(e){
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not save — check your internet connection and try again.</span>';
+  }
 }
 
 async function saveStoreHours(){
@@ -979,11 +984,13 @@ function renderManageItems(){
         <input type="file" accept="image/*" style="display:none;" onchange="changeItemPhoto('${item.id}', this)">
       </label>
       <div class="menu-manage-body" id="menuItemDisplay-${item.id}">
-        <div class="n">${item.name}</div><div class="p">₦${Number(item.price).toLocaleString()}</div>
+        <div class="n">${item.name}</div>
+        <div class="p">${item.promo_price != null ? `<span style="text-decoration:line-through; color:var(--ink-soft); font-weight:400;">₦${Number(item.price).toLocaleString()}</span> ₦${Number(item.promo_price).toLocaleString()} <span style="color:var(--rose-deep); font-weight:700; font-size:11px;">PROMO</span>` : `₦${Number(item.price).toLocaleString()}`}</div>
       </div>
       <div class="menu-manage-body" id="menuItemEdit-${item.id}" style="display:none;">
         <input type="text" id="editName-${item.id}" value="${item.name}" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; margin-bottom:4px;">
-        <input type="text" id="editPrice-${item.id}" value="${item.price}" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
+        <input type="text" id="editPrice-${item.id}" value="${item.price}" placeholder="Price" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; margin-bottom:4px;">
+        <input type="text" id="editPromoPrice-${item.id}" value="${item.promo_price != null ? item.promo_price : ''}" placeholder="Promo price (optional)" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
       </div>
       <button class="switch ${item.in_stock?'on':''}" onclick="toggleManageStock('${item.id}')"></button>
       <button id="editBtn-${item.id}" onclick="toggleEditItem('${item.id}')" style="background:none; border:none; color:var(--ink-soft); font-size:16px;">✎</button>
@@ -1006,8 +1013,11 @@ function toggleEditItem(id){
 async function saveItemEdit(id){
   const name = document.getElementById('editName-'+id).value.trim();
   const price = document.getElementById('editPrice-'+id).value.trim();
+  const promoPriceInput = document.getElementById('editPromoPrice-'+id).value.trim();
   if(!name || !price) return;
-  await supabaseClient.from('menu_items').update({ name, price: Number(price) }).eq('id', id);
+  const promo_price = promoPriceInput ? Number(promoPriceInput) : null;
+  if(promo_price != null && promo_price >= Number(price)){ alert('Promo price should be lower than the regular price.'); return; }
+  await supabaseClient.from('menu_items').update({ name, price: Number(price), promo_price }).eq('id', id);
   await loadMenu();
 }
 async function toggleManageStock(id){
@@ -1025,7 +1035,10 @@ function previewNewItemPhoto(inputEl){
 async function saveNewMenuItem(){
   const name = document.getElementById('newItemName').value.trim();
   const price = document.getElementById('newItemPrice').value.trim();
+  const promoPriceInput = document.getElementById('newItemPromoPrice').value.trim();
   if(!name || !price){ alert('Enter a name and price.'); return; }
+  const promo_price = promoPriceInput ? Number(promoPriceInput) : null;
+  if(promo_price != null && promo_price >= Number(price)){ alert('Promo price should be lower than the regular price.'); return; }
 
   let photo_url = null;
   if(newItemPhotoFile){
@@ -1036,10 +1049,11 @@ async function saveNewMenuItem(){
     photo_url = data.publicUrl;
   }
 
-  await supabaseClient.from('menu_items').insert([{ vendor_id: currentVendor.id, name, price: Number(price), in_stock: true, photo_url }]);
+  await supabaseClient.from('menu_items').insert([{ vendor_id: currentVendor.id, name, price: Number(price), promo_price, in_stock: true, photo_url }]);
 
   document.getElementById('newItemName').value = '';
   document.getElementById('newItemPrice').value = '';
+  document.getElementById('newItemPromoPrice').value = '';
   document.getElementById('newItemPhotoLabel').textContent = '📷 Tap to choose a photo';
   newItemPhotoFile = null;
   document.getElementById('newItemForm').style.display = 'none';
