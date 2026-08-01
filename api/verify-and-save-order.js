@@ -28,8 +28,35 @@ export default async function handler(req, res) {
   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sbHeaders = { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` };
 
   try {
+    // ---- Step 0: recompute the real subtotal from actual menu_items
+    // prices — never trust prices or quantities sent from the browser.
+    // This is what makes promo pricing (and every other price) safe:
+    // a customer's browser can say whatever it wants, only the database's
+    // real price/promo_price ever actually gets charged.
+    const itemIds = order.items.map(i => i.menuItemId);
+    const menuRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/menu_items?id=in.(${itemIds.join(',')})&select=id,price,promo_price,in_stock`,
+      { headers: sbHeaders }
+    );
+    const realItems = await menuRes.json();
+    const realItemsById = Object.fromEntries(realItems.map(i => [i.id, i]));
+
+    let realSubtotal = 0;
+    for (const orderedItem of order.items) {
+      const real = realItemsById[orderedItem.menuItemId];
+      if (!real) return res.status(400).json({ error: 'One of the items in your cart no longer exists — please refresh and try again.' });
+      if (!real.in_stock) return res.status(400).json({ error: 'One of the items in your cart just went out of stock — please refresh and try again.' });
+      const realPrice = (real.promo_price != null && Number(real.promo_price) < Number(real.price)) ? Number(real.promo_price) : Number(real.price);
+      realSubtotal += realPrice * orderedItem.qty;
+    }
+    if (Math.abs(Number(order.subtotal) - realSubtotal) > 1) {
+      console.error(`Subtotal mismatch: client sent ${order.subtotal}, real total is ${realSubtotal}`);
+      return res.status(400).json({ error: 'Item prices have changed — please refresh your cart and try again.' });
+    }
+
     // ---- Step 1: verify the payment really happened ----
     const verifyRes = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
