@@ -73,6 +73,13 @@
   .note{font-size:12px; color:var(--ink-soft); background:rgba(107,80,88,0.06); border-radius:10px; padding:10px 12px; margin:12px 0;}
   .empty{text-align:center; color:var(--ink-soft); padding:30px 20px; font-size:13.5px;}
 </style>
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 </head>
 <body>
 
@@ -296,10 +303,10 @@ async function markPickedUp(orderId){
 
 async function notifyCustomer(orderId, status){
   try {
-    await fetch('/api/notify-customer', {
+    await fetch('/api/notify', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ orderId, status })
+      body: JSON.stringify({ type: 'customer', orderId, status })
     });
   } catch(e){ console.error('Customer notification failed', e); }
 }
@@ -329,9 +336,5 @@ if(!window.location.hash.includes('type=recovery')){
   });
 }
 </script>
-
-<!-- Vercel Web Analytics -->
-<script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
-
 </body>
 </html>
