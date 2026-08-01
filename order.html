@@ -183,6 +183,7 @@
     <div class="store-hero-info">
       <h2 id="storeHeroName"></h2>
       <div class="meta" id="storeHeroMeta"></div>
+      <div class="meta" id="storeHeroAddress" style="display:none; font-size:12px; margin-top:2px;"></div>
     </div>
   </div>
   <div id="storeAvailabilityBanner" style="display:none; margin:12px 16px; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:600;"></div>
@@ -799,6 +800,7 @@ async function loadStores(){
       opening_time: v.opening_time || null,
       closing_time: v.closing_time || null,
       is_open: v.is_open,
+      address: v.address || null,
       menu: items.map(m => ({
         id: m.id, name: m.name, desc: m.description, price: Number(m.price),
         img: m.photo_url, inStock: m.in_stock
@@ -847,6 +849,7 @@ function renderStores(filterCat){
       <div class="store-row-body">
         <h3>${s.name} ${badge}</h3>
         <div class="store-row-meta"><span class="rating">★ ${s.rating}</span><span>· ${s.time}</span></div>
+        ${s.opening_time && s.closing_time ? `<div class="store-row-meta" style="font-size:11px;">${avail.open ? 'Open' : 'Opens'} ${formatTime(s.opening_time)} – ${formatTime(s.closing_time)}</div>` : ''}
       </div>
     </a>
   `;
@@ -870,6 +873,17 @@ function openStore(id){
   document.getElementById('storeHeroImg').src = currentStore.img;
   document.getElementById('storeHeroName').textContent = currentStore.name;
   document.getElementById('storeHeroMeta').textContent = `★ ${currentStore.rating} · ${currentStore.time}`;
+  if(currentStore.opening_time && currentStore.closing_time){
+    const isOpenNow = getStoreAvailability(currentStore).open;
+    document.getElementById('storeHeroMeta').textContent += ` · ${isOpenNow ? 'Open' : 'Opens'} ${formatTime(currentStore.opening_time)} – ${formatTime(currentStore.closing_time)}`;
+  }
+  const addressEl = document.getElementById('storeHeroAddress');
+  if(currentStore.address){
+    addressEl.innerHTML = `📍 ${currentStore.address} · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentStore.address + ', Sokoto, Nigeria')}" target="_blank" rel="noopener">Get directions</a>`;
+    addressEl.style.display = 'block';
+  } else {
+    addressEl.style.display = 'none';
+  }
 
   const avail = getStoreAvailability(currentStore);
   const bannerEl = document.getElementById('storeAvailabilityBanner');
