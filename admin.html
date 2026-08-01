@@ -631,11 +631,15 @@ async function confirmVdLocation(){
   if(!address){ resultEl.innerHTML = '<span style="color:var(--red);">Add an address first.</span>'; return; }
   if(!pos){ resultEl.innerHTML = '<span style="color:var(--red);">Map isn\'t ready yet — wait a moment and try again.</span>'; return; }
   resultEl.textContent = 'Saving…';
-  const { error } = await supabaseClient.from('vendors').update({ address, lat: pos.lat, lng: pos.lng }).eq('id', currentDetailVendorId);
-  if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save: ${error.message}</span>`; return; }
-  resultEl.innerHTML = `✅ Location saved.`;
-  const v = allVendorsData.find(x => x.id === currentDetailVendorId);
-  if(v){ v.address = address; v.lat = pos.lat; v.lng = pos.lng; }
+  try {
+    const { error } = await supabaseClient.from('vendors').update({ address, lat: pos.lat, lng: pos.lng }).eq('id', currentDetailVendorId);
+    if(error){ resultEl.innerHTML = `<span style="color:var(--red);">Could not save: ${error.message}</span>`; return; }
+    resultEl.innerHTML = `✅ Location saved.`;
+    const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+    if(v){ v.address = address; v.lat = pos.lat; v.lng = pos.lng; }
+  } catch(e){
+    resultEl.innerHTML = '<span style="color:var(--red);">Could not save — check your internet connection and try again.</span>';
+  }
 }
 
 function renderVdAccountStatus(v){
@@ -746,12 +750,19 @@ async function saveVendorDetail(){
     opening_time: document.getElementById('vdOpeningTime').value || null,
     closing_time: document.getElementById('vdClosingTime').value || null,
   };
-  const { error } = await supabaseClient.from('vendors').update(updates).eq('id', currentDetailVendorId);
   const savedEl = document.getElementById('vdSaved');
-  if(error){ savedEl.style.color='var(--red)'; savedEl.textContent = 'Could not save: ' + error.message; return; }
-  savedEl.style.color='var(--green)';
-  savedEl.textContent = '✓ Saved';
-  await loadVendors();
+  try {
+    const { error } = await supabaseClient.from('vendors').update(updates).eq('id', currentDetailVendorId);
+    if(error){ savedEl.style.color='var(--red)'; savedEl.textContent = 'Could not save: ' + error.message; return; }
+    savedEl.style.color='var(--green)';
+    savedEl.textContent = '✓ Saved';
+    await loadVendors();
+  } catch(e){
+    // A network failure (dropped connection, etc.) throws instead of
+    // returning a normal error — without this, that failure was silent.
+    savedEl.style.color='var(--red)';
+    savedEl.textContent = 'Could not save — check your internet connection and try again.';
+  }
 }
 
 // Turns a locally-formatted Nigerian number (e.g. "0803 123 4567") into
