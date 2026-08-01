@@ -613,6 +613,17 @@ function isStoreOpenNow(v){
   const toMinutes = (t) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
   return nowMinutes >= toMinutes(v.opening_time) && nowMinutes <= toMinutes(v.closing_time);
 }
+function formatTime(t){
+  if(!t) return '';
+  const [h,m] = t.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+function hoursLabel(v){
+  if(!v.opening_time || !v.closing_time) return '';
+  return `${isStoreOpenNow(v) ? 'Open' : 'Opens'} ${formatTime(v.opening_time)} – ${formatTime(v.closing_time)}`;
+}
 
 function renderHomepageStores(vendors){
   const grid = document.getElementById('storeGrid');
@@ -622,6 +633,7 @@ function renderHomepageStores(vendors){
   }
   grid.innerHTML = vendors.slice(0,6).map(v => {
     const open = isStoreOpenNow(v);
+    const hours = hoursLabel(v);
     return `
     <a href="order.html?store=${v.id}" class="store-card" style="display:block; ${open ? '' : 'opacity:0.55;'}">
       <div class="store-img">
@@ -631,6 +643,7 @@ function renderHomepageStores(vendors){
       <div class="store-body">
         <h3>${v.name}</h3>
         <div class="store-meta"><span class="rating">★ ${v.rating || '—'}</span><span>· ${v.category}</span></div>
+        ${hours ? `<div class="store-meta" style="margin-top:2px; font-size:11.5px;">${hours}</div>` : ''}
       </div>
     </a>
   `;
@@ -652,9 +665,6 @@ document.querySelectorAll('.cat-pill').forEach(pill => {
 
 loadHomepageStores();
 </script>
-
-<!-- Vercel Web Analytics -->
-<script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 
 </body>
 </html>
