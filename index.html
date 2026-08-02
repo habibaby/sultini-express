@@ -601,8 +601,13 @@ let allHomepageVendors = [];
 async function reflectLoginState(){
   const { data: { session } } = await supabaseClient.auth.getSession();
   const loggedIn = !!session;
-  document.getElementById('navActionsLoggedOut').style.display = loggedIn ? 'none' : 'flex';
-  document.getElementById('navActionsLoggedIn').style.display = loggedIn ? 'flex' : 'none';
+  // Use '' (not 'flex') to SHOW — that clears the inline override and lets
+  // the .desktop-only CSS class (and its 760px media query) decide the
+  // actual display value. Setting 'flex' directly here was overriding the
+  // responsive rule entirely, forcing these desktop-only buttons to show
+  // on phones too, regardless of screen width.
+  document.getElementById('navActionsLoggedOut').style.display = loggedIn ? 'none' : '';
+  document.getElementById('navActionsLoggedIn').style.display = loggedIn ? '' : 'none';
   document.getElementById('mmenuLoggedOut').style.display = loggedIn ? 'none' : 'block';
   document.getElementById('mmenuLoggedIn').style.display = loggedIn ? 'block' : 'none';
 }
