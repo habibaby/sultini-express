@@ -649,13 +649,35 @@ function hoursLabel(v){
   return `${isStoreOpenNow(v) ? 'Open' : 'Opens'} ${formatTime(v.opening_time)} – ${formatTime(v.closing_time)}`;
 }
 
+// A different, fair order every day — same for everyone visiting that day,
+// but no store sits permanently at the top. Seeded by today's date, so it's
+// stable all day (not re-shuffling on every page load) and changes tomorrow.
+function seededShuffle(array, seedString){
+  let seed = 0;
+  for(let i = 0; i < seedString.length; i++){
+    seed = (seed * 31 + seedString.charCodeAt(i)) >>> 0;
+  }
+  function nextRandom(){
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  }
+  const result = [...array];
+  for(let i = result.length - 1; i > 0; i--){
+    const j = Math.floor(nextRandom() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 function renderHomepageStores(vendors){
   const grid = document.getElementById('storeGrid');
   if(!vendors || vendors.length === 0){
     grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">No stores match that category yet.</div>';
     return;
   }
-  grid.innerHTML = vendors.slice(0,6).map(v => {
+  const todaySeed = new Date().toISOString().slice(0,10); // e.g. "2026-08-03"
+  const rotated = seededShuffle(vendors, todaySeed);
+  grid.innerHTML = rotated.map(v => {
     const open = isStoreOpenNow(v);
     const hours = hoursLabel(v);
     return `
