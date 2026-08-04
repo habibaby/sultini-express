@@ -254,7 +254,7 @@ async function loadAvailableDeliveries(){
       <div class="top">
         <div><div class="oid">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4></div>
       </div>
-      <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}</div>
+      <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}${o.guest_name ? `<br>For: ${o.guest_name}` : ''}</div>
       <div class="order-actions"><button class="primary" onclick="claimDelivery('${o.id}')">Accept this delivery</button></div>
     </div>
   `).join('');
@@ -286,7 +286,9 @@ async function loadDeliveries(){
         <div><div class="oid">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4></div>
         <span class="status-pill ${isDone?'done':'assigned'}">${o.status}</span>
       </div>
-      <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}</div>
+      <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}
+        ${o.guest_name || o.guest_phone ? `<br>Customer: ${o.guest_name || ''}${o.guest_phone ? ` — <a href="tel:${o.guest_phone}" style="color:inherit; font-weight:700;">${o.guest_phone}</a>` : ''}` : ''}
+      </div>
       ${!isDone ? `<div class="order-actions">
         ${o.status==='out_for_delivery' ? `<button class="primary" onclick="markPickedUp('${o.id}')">Picked up from store</button>` : ''}
         ${o.status==='picked_up' ? `<button class="primary" onclick="markDelivered('${o.id}')">Mark delivered</button>` : ''}
