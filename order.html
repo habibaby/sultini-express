@@ -425,12 +425,21 @@ async function calculateFeeFromPin(){
       body: JSON.stringify({ action: 'calculate-fee', vendorId: currentStore.id, lat: REAL_DELIVERY_LAT, lng: REAL_DELIVERY_LNG })
     });
     const feeResult = await feeResp.json();
-    if(!feeResp.ok){ resultEl.textContent = feeResult.fallback ? 'This store hasn\'t confirmed its exact location yet — using the standard delivery fee.' : 'Could not calculate an exact fee — using the standard delivery fee.'; renderSummary(); return; }
+    if(!feeResp.ok){
+      // Fee calc failed — clear the coordinates too, not just the fee.
+      // Otherwise the order gets sent with real coordinates alongside a
+      // flat fallback fee, and the server (correctly) rejects that
+      // mismatch, since real coordinates imply a distance-based fee.
+      REAL_DELIVERY_LAT = null; REAL_DELIVERY_LNG = null;
+      resultEl.textContent = feeResult.fallback ? 'This store hasn\'t confirmed its exact location yet — using the standard delivery fee.' : 'Could not calculate an exact fee — using the standard delivery fee.';
+      renderSummary(); return;
+    }
     REAL_DELIVERY_FEE = feeResult.fee;
     REAL_DELIVERY_DISTANCE_KM = feeResult.distanceKm;
     resultEl.textContent = `✓ ${feeResult.distanceKm}km away — delivery fee calculated for your pinned location.`;
     renderSummary();
   } catch(e){
+    REAL_DELIVERY_LAT = null; REAL_DELIVERY_LNG = null;
     resultEl.textContent = 'Could not calculate an exact fee — using the standard delivery fee.';
     renderSummary();
   }
