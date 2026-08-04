@@ -525,6 +525,21 @@ async function deleteVendor(id, name){
 
 // ---- Vendor detail / edit ----
 let currentDetailVendorId = null;
+
+// Same calculation as vendor.html — admin edits in "what the vendor
+// receives" too, never the raw listed price, so there's never a
+// mismatch between what a vendor sees and what admin sets on their behalf.
+let VENDOR_SHARE_PCT = 80;
+async function loadVendorSharePct(){
+  const { data } = await supabaseClient.from('platform_settings').select('*').eq('key','vendor_share_pct');
+  if(data && data[0]) VENDOR_SHARE_PCT = Number(data[0].value);
+}
+function computeListedPrice(targetAmount){
+  if(!targetAmount) return null;
+  const raw = Number(targetAmount) / (VENDOR_SHARE_PCT / 100);
+  return Math.round(raw / 10) * 10;
+}
+loadVendorSharePct();
 const VENDOR_CATEGORIES = ['Local dishes','Grills & Suya','Chicken','Drinks & Fura','Desserts','Pharmacy'];
 
 async function viewVendorDetail(id){
@@ -557,10 +572,10 @@ async function viewVendorDetail(id){
   document.getElementById('vdCategorySelect').innerHTML = VENDOR_CATEGORIES.map(c =>
     `<option value="${c}" ${c===v.category?'selected':''}>${c}</option>`).join('');
 
+  await loadVendorSharePct();
   const { data: menuItems } = await supabaseClient.from('menu_items').select('*').eq('vendor_id', id);
-  document.getElementById('vdMenuList').innerHTML = (menuItems && menuItems.length)
-    ? menuItems.map(m => `<div class="rider-row"><div><div class="n">${m.name}</div><div class="m">₦${Number(m.price).toLocaleString()}</div></div><span class="pill ${m.in_stock?'approved':'flag'}">${m.in_stock?'In stock':'Out of stock'}</span></div>`).join('')
-    : '<div class="empty">No menu items yet.</div>';
+  window.currentDetailMenuItems = menuItems || [];
+  renderVdMenuList();
 
   const { data: vendorOrders } = await supabaseClient.from('orders').select('*').eq('vendor_id', id).order('created_at',{ascending:false}).limit(20);
   document.getElementById('vdOrderList').innerHTML = (vendorOrders && vendorOrders.length)
@@ -649,6 +664,36 @@ async function confirmVdLocation(){
   }
 }
 
+function renderVdMenuList(){
+  const items = window.currentDetailMenuItems || [];
+  const el = document.getElementById('vdMenuList');
+  if(!items.length){ el.innerHTML = '<div class="empty">No menu items yet.</div>'; return; }
+  el.innerHTML = items.map(m => `
+    <div class="rider-row" style="flex-direction:column; align-items:stretch; gap:6px;">
+      <div id="vdItemDisplay-${m.id}" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div class="n">${m.name}</div>
+          <div class="m">₦${Number(m.vendor_target_price ?? m.price).toLocaleString()} they receive
+            ${m.promo_price != null ? ` · promo ₦${Number(m.vendor_target_promo_price ?? m.promo_price).toLocaleString()}` : ''}
+          </div>
+          <div class="m" style="font-size:10.5px;">Listed to customers at ₦${Number(m.price).toLocaleString()}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="pill ${m.in_stock?'approved':'flag'}">${m.in_stock?'In stock':'Out of stock'}</span>
+          <button onclick="toggleVdItemEdit('${m.id}')" style="background:none; border:none; color:var(--ink-soft); font-size:16px;">✎</button>
+        </div>
+      </div>
+      <div id="vdItemEdit-${m.id}" style="display:none;">
+        <input type="text" id="vdEditName-${m.id}" value="${m.name}" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; margin-bottom:4px;">
+        <div class="field-row" style="display:flex; gap:8px;">
+          <input type="text" id="vdEditPrice-${m.id}" value="${m.vendor_target_price ?? m.price}" placeholder="They receive (₦)" style="flex:1; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
+          <input type="text" id="vdEditPromo-${m.id}" value="${m.vendor_target_promo_price ?? (m.promo_price != null ? m.promo_price : '')}" placeholder="Promo (optional)" style="flex:1; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
+        </div>
+        <button class="btn" style="margin-top:6px;" onclick="saveVdItemEdit('${m.id}')">Save item</button>
+      </div>
+    </div>`).join('');
+}
+
 function renderVdAccountStatus(v){
   const el = document.getElementById('vdAccountStatus');
   if(v.account_verified && v.account_name){
@@ -658,6 +703,37 @@ function renderVdAccountStatus(v){
     el.innerHTML = `⚠️ No verified payout account yet — this vendor cannot be paid until verified below.`;
     el.style.color = 'var(--red)';
   }
+}
+
+function toggleVdItemEdit(id){
+  const display = document.getElementById('vdItemDisplay-'+id);
+  const edit = document.getElementById('vdItemEdit-'+id);
+  const opening = edit.style.display === 'none';
+  display.style.display = opening ? 'none' : 'flex';
+  edit.style.display = opening ? 'block' : 'none';
+}
+
+async function saveVdItemEdit(id){
+  const name = document.getElementById('vdEditName-'+id).value.trim();
+  const targetPrice = document.getElementById('vdEditPrice-'+id).value.trim();
+  const targetPromoInput = document.getElementById('vdEditPromo-'+id).value.trim();
+  if(!name || !targetPrice) return;
+  const targetPromo = targetPromoInput ? Number(targetPromoInput) : null;
+  if(targetPromo != null && targetPromo >= Number(targetPrice)){ alert('The promo amount should be lower than the regular amount.'); return; }
+
+  await loadVendorSharePct();
+  const price = computeListedPrice(targetPrice);
+  const promo_price = targetPromo != null ? computeListedPrice(targetPromo) : null;
+
+  const { error } = await supabaseClient.from('menu_items').update({
+    name, vendor_target_price: Number(targetPrice), price,
+    vendor_target_promo_price: targetPromo, promo_price,
+  }).eq('id', id);
+  if(error){ alert('Could not save: ' + error.message); return; }
+
+  const item = window.currentDetailMenuItems.find(m => m.id === id);
+  if(item){ Object.assign(item, { name, vendor_target_price: Number(targetPrice), price, vendor_target_promo_price: targetPromo, promo_price }); }
+  renderVdMenuList();
 }
 
 let vdAccountVerified = false;
