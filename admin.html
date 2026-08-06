@@ -155,14 +155,42 @@
 
   <div class="section-label">Needs your attention</div>
   <div id="attentionContainer">Loading…</div>
+
+  <div class="section-label">Conversion funnel — last 7 days</div>
+  <div id="funnelContainer">Loading…</div>
 </section>
 
 <!-- VENDORS -->
 <section class="page" id="page-vendors">
   <div class="page-title">Vendors</div>
   <div class="page-sub">Approve new stores before they go live</div>
-  <input type="text" placeholder="Search vendors by name or category…" id="vendorSearch" oninput="filterAndRenderVendors()" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px; margin-bottom:14px;">
+  <button class="btn" onclick="go('add-vendor')" style="margin-bottom:12px;">＋ Add a vendor I manage</button>
+  <div id="managedVendorsSection" style="display:none;">
+    <div class="section-label">Vendors you manage — daily check-in</div>
+    <div id="managedVendorsContainer"></div>
+  </div>
+  <input type="text" placeholder="Search vendors by name or category…" id="vendorSearch" oninput="filterAndRenderVendors()" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px; margin-bottom:14px; margin-top:14px;">
   <div id="vendorsContainer">Loading…</div>
+</section>
+
+<!-- ADD VENDOR (admin-managed) -->
+<section class="page" id="page-add-vendor">
+  <button onclick="go('vendors')" style="background:none; border:none; color:var(--plum); font-weight:700; font-size:13px; margin-bottom:10px;">← Back to Vendors</button>
+  <div class="page-title">Add a vendor you manage</div>
+  <div class="page-sub">For restaurants that can't manage their own dashboard — you'll run their store on their behalf. No login needed for them.</div>
+
+  <div class="field"><label>Store name</label><input type="text" id="newVdName"></div>
+  <div class="field">
+    <label>Category</label>
+    <select id="newVdCategory" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select>
+  </div>
+  <div class="field"><label>Phone</label><input type="text" id="newVdPhone"></div>
+  <div class="field"><label>WhatsApp</label><input type="text" id="newVdWhatsapp"></div>
+  <div class="field"><label>Address</label><input type="text" id="newVdAddress" placeholder="e.g. 12 Runjin Sambo Road, Sokoto"></div>
+
+  <button class="btn btn-primary" onclick="createAdminManagedVendor()" style="margin-top:8px;">Create store</button>
+  <div id="newVdResult" style="font-size:12.5px; margin-top:8px; font-weight:600;"></div>
+  <div class="meta" style="margin-top:10px;">After this, you'll land on the store's own page to verify their bank account, confirm their location, and add their menu — same tools you already use for every vendor.</div>
 </section>
 
 <!-- ORDERS -->
@@ -273,6 +301,22 @@
       <div class="meta">Overrides scheduled hours — use for sold-out days or emergencies.</div>
     </div>
     <button id="vdManualOpenToggle" onclick="toggleVendorManualOpen()" style="border:none; border-radius:20px; padding:10px 16px; font-weight:700; font-size:13px; cursor:pointer;"></button>
+  </div>
+
+  <div style="display:flex; align-items:center; justify-content:space-between; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; margin:12px 0;">
+    <div>
+      <div style="font-weight:700;">Instant payout</div>
+      <div class="meta">Skips the normal 24hr dispute window for this vendor — their money is available the moment an order is marked delivered. Only use this for vendors whose orders you're personally managing and confirming yourself.</div>
+    </div>
+    <button id="vdInstantPayoutToggle" onclick="toggleVendorInstantPayout()" style="border:none; border-radius:20px; padding:10px 16px; font-weight:700; font-size:13px; cursor:pointer; flex-shrink:0; margin-left:12px;"></button>
+  </div>
+
+  <div style="display:flex; align-items:center; justify-content:space-between; background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; margin:12px 0;">
+    <div>
+      <div style="font-weight:700;">Managed by admin</div>
+      <div class="meta">Switch this on if you'll be running this store's orders yourself — new-order alerts come to you instead of them, and you'll see accept/reject/ready actions on their orders here in admin.</div>
+    </div>
+    <button id="vdManagedByAdminToggle" onclick="toggleVendorManagedByAdmin()" style="border:none; border-radius:20px; padding:10px 16px; font-weight:700; font-size:13px; cursor:pointer; flex-shrink:0; margin-left:12px;"></button>
   </div>
 
   <div style="background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:14px; margin:12px 0;">
@@ -443,6 +487,28 @@ async function loadOverview(){
     cards += `<div class="card"><div class="top"><div><h4>Cash-out · ${who}</h4><div class="meta">₦${Number(e.amount).toLocaleString()} requested · dispute window clear</div></div><span class="pill pending">Pending</span></div><div class="row-actions"><button class="primary" onclick="go('payouts')">Review</button></div></div>`;
   });
   document.getElementById('attentionContainer').innerHTML = cards || '<div class="empty">Nothing needs attention right now.</div>';
+  loadFunnel();
+}
+
+async function loadFunnel(){
+  const sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+  const { data: events } = await supabaseClient
+    .from('funnel_events').select('event_type').gte('created_at', sevenDaysAgo);
+
+  const counts = { store_viewed: 0, checkout_started: 0, order_completed: 0 };
+  (events || []).forEach(e => { if(counts[e.event_type] != null) counts[e.event_type]++; });
+
+  const viewToCheckout = counts.store_viewed ? Math.round(counts.checkout_started / counts.store_viewed * 100) : 0;
+  const checkoutToOrder = counts.checkout_started ? Math.round(counts.order_completed / counts.checkout_started * 100) : 0;
+
+  document.getElementById('funnelContainer').innerHTML = `
+    <div class="metric-grid">
+      <div class="metric-card"><div class="l">Store views</div><div class="v">${counts.store_viewed}</div></div>
+      <div class="metric-card"><div class="l">Checkouts started</div><div class="v">${counts.checkout_started}</div><div class="l" style="margin-top:2px;">${viewToCheckout}% of views</div></div>
+      <div class="metric-card"><div class="l">Orders completed</div><div class="v">${counts.order_completed}</div><div class="l" style="margin-top:2px;">${checkoutToOrder}% of checkouts</div></div>
+    </div>
+    <div class="meta" style="margin-top:8px;">If checkouts started is high but orders completed is low, that's a real signal something in the payment step is losing people — worth a closer look.</div>
+  `;
 }
 
 // ---- Vendors ----
@@ -459,6 +525,32 @@ async function loadVendors(){
   if(pendingCount > 0){ badge.dataset.n = pendingCount; badge.classList.add('badge-dot'); }
   else { badge.classList.remove('badge-dot'); }
   filterAndRenderVendors();
+  renderManagedVendorsCheckIn();
+}
+
+function renderManagedVendorsCheckIn(){
+  const managed = allVendorsData.filter(v => v.managed_by_admin);
+  const section = document.getElementById('managedVendorsSection');
+  if(managed.length === 0){ section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const today = new Date().toDateString();
+  document.getElementById('managedVendorsContainer').innerHTML = managed.map(v => {
+    const checkedInToday = v.last_checked_in_at && new Date(v.last_checked_in_at).toDateString() === today;
+    return `
+    <div class="rider-row">
+      <div><div class="n">${v.name}</div><div class="m">${v.category}${v.instant_payout ? ' · ⚡ Instant payout' : ''}</div></div>
+      <button class="btn" style="${checkedInToday ? 'background:#DCEFE1; color:#1F5D3A;' : ''}" onclick="checkInVendor('${v.id}')">${checkedInToday ? '✓ Checked in today' : 'Check in today'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function checkInVendor(id){
+  const { error } = await supabaseClient.from('vendors').update({ last_checked_in_at: new Date().toISOString() }).eq('id', id);
+  if(error){ alert('Could not save: ' + error.message); return; }
+  const v = allVendorsData.find(x => x.id === id);
+  if(v) v.last_checked_in_at = new Date().toISOString();
+  renderManagedVendorsCheckIn();
 }
 
 function filterAndRenderVendors(){
@@ -541,6 +633,34 @@ function computeListedPrice(targetAmount){
 }
 loadVendorSharePct();
 const VENDOR_CATEGORIES = ['Local dishes','Grills & Suya','Chicken','Drinks & Fura','Desserts','Pharmacy'];
+document.getElementById('newVdCategory').innerHTML = VENDOR_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+
+async function createAdminManagedVendor(){
+  const name = document.getElementById('newVdName').value.trim();
+  const category = document.getElementById('newVdCategory').value;
+  const phone = document.getElementById('newVdPhone').value.trim();
+  const whatsapp = document.getElementById('newVdWhatsapp').value.trim();
+  const address = document.getElementById('newVdAddress').value.trim();
+  const resultEl = document.getElementById('newVdResult');
+
+  if(!name || !phone || !address){ resultEl.style.color='var(--red)'; resultEl.textContent = 'Store name, phone, and address are required.'; return; }
+
+  resultEl.style.color = 'var(--ink-soft)'; resultEl.textContent = 'Creating…';
+  const { data, error } = await supabaseClient.from('vendors').insert([{
+    name, category, phone, whatsapp: whatsapp || phone, address,
+    status: 'approved', managed_by_admin: true, owner_id: null,
+  }]).select().single();
+
+  if(error){ resultEl.style.color='var(--red)'; resultEl.textContent = 'Could not create: ' + error.message; return; }
+
+  document.getElementById('newVdName').value = '';
+  document.getElementById('newVdPhone').value = '';
+  document.getElementById('newVdWhatsapp').value = '';
+  document.getElementById('newVdAddress').value = '';
+
+  await loadVendors();
+  viewVendorDetail(data.id);
+}
 
 async function viewVendorDetail(id){
   currentDetailVendorId = id;
@@ -569,6 +689,8 @@ async function viewVendorDetail(id){
   document.getElementById('vdOpeningTime').value = v.opening_time || '';
   document.getElementById('vdClosingTime').value = v.closing_time || '';
   renderVendorManualOpenToggle(v);
+  renderVendorInstantPayoutToggle(v);
+  renderVendorManagedByAdminToggle(v);
   document.getElementById('vdCategorySelect').innerHTML = VENDOR_CATEGORIES.map(c =>
     `<option value="${c}" ${c===v.category?'selected':''}>${c}</option>`).join('');
 
@@ -598,6 +720,46 @@ async function toggleVendorManualOpen(){
   if(error){ alert('Could not update: ' + error.message); return; }
   v.is_open = newState;
   renderVendorManualOpenToggle(v);
+}
+
+function renderVendorInstantPayoutToggle(v){
+  const btn = document.getElementById('vdInstantPayoutToggle');
+  const isInstant = v.instant_payout === true;
+  btn.textContent = isInstant ? '⚡ Instant' : 'Standard (24hr)';
+  btn.style.background = isInstant ? '#DCEFE1' : '#EFEBE4';
+  btn.style.color = isInstant ? '#1F5D3A' : 'var(--ink-soft)';
+}
+
+async function toggleVendorInstantPayout(){
+  const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+  const newState = !(v.instant_payout === true);
+  if(newState && !confirm('This vendor\'s money will be available to withdraw the moment an order is marked delivered, skipping the normal dispute window. Only do this for vendors whose orders you personally manage and confirm yourself. Continue?')) return;
+  const { error } = await supabaseClient.from('vendors').update({ instant_payout: newState }).eq('id', currentDetailVendorId);
+  if(error){ alert('Could not update: ' + error.message); return; }
+  v.instant_payout = newState;
+  renderVendorInstantPayoutToggle(v);
+}
+
+function renderVendorManagedByAdminToggle(v){
+  const btn = document.getElementById('vdManagedByAdminToggle');
+  const isManaged = v.managed_by_admin === true;
+  btn.textContent = isManaged ? '⚡ You manage this' : 'Self-managed';
+  btn.style.background = isManaged ? '#DCEFE1' : '#EFEBE4';
+  btn.style.color = isManaged ? '#1F5D3A' : 'var(--ink-soft)';
+}
+
+async function toggleVendorManagedByAdmin(){
+  const v = allVendorsData.find(x => x.id === currentDetailVendorId);
+  const newState = !(v.managed_by_admin === true);
+  const confirmMsg = newState
+    ? 'From now on, new-order alerts for this store will come to you instead of the vendor, and you\'ll process their orders here in admin. Continue?'
+    : 'This store will go back to managing its own orders and receiving its own new-order alerts. Continue?';
+  if(!confirm(confirmMsg)) return;
+  const { error } = await supabaseClient.from('vendors').update({ managed_by_admin: newState }).eq('id', currentDetailVendorId);
+  if(error){ alert('Could not update: ' + error.message); return; }
+  v.managed_by_admin = newState;
+  renderVendorManagedByAdminToggle(v);
+  renderManagedVendorsCheckIn();
 }
 
 // ---- Map picker: type an address to jump there, then drag the pin to
@@ -876,7 +1038,7 @@ function messageVendorAboutOrder(phone, vendorName, pickupCode, total){
 
 // ---- Orders ----
 async function loadOrders(){
-  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name, whatsapp, phone), riders(full_name, phone)').order('created_at',{ascending:false}).limit(60);
+  const { data: orders } = await supabaseClient.from('orders').select('*, vendors(name, whatsapp, phone, managed_by_admin), riders(full_name, phone)').order('created_at',{ascending:false}).limit(60);
   allOrdersData = orders || [];
   const { data: activeRiders } = await supabaseClient.from('riders').select('id, full_name, phone, dedicated_vendor_id').eq('active', true);
   allActiveRidersForOrders = activeRiders || [];
@@ -928,10 +1090,33 @@ function filterAndRenderOrders(){
     } else if(o.payment_status === 'refunded'){
       refundSection = `<div class="meta" style="margin-top:6px; color:var(--red);">↩ Refunded</div>`;
     }
+
+    // For vendors you manage yourself — they have no dashboard of their own,
+    // so processing their orders has to happen here.
+    let managedOrderActions = '';
+    if(o.vendors?.managed_by_admin){
+      if(o.status === 'new'){
+        managedOrderActions = `<div class="row-actions" style="margin-top:6px;">
+          <button class="danger" onclick="adminRejectOrder('${o.id}','${o.payment_method}')">Reject</button>
+          <button class="primary" onclick="adminUpdateOrderStatus('${o.id}','preparing')">Accept order</button>
+        </div>`;
+      } else if(o.status === 'preparing'){
+        managedOrderActions = `<div class="row-actions" style="margin-top:6px;">
+          <button class="primary" onclick="adminUpdateOrderStatus('${o.id}','ready','${o.pickup_code}','${o.fulfilment}')">Mark as ready</button>
+        </div>`;
+      } else if(o.status === 'ready' && o.fulfilment === 'pickup'){
+        managedOrderActions = `<div class="row-actions" style="margin-top:6px;">
+          <input type="text" id="adminPickupCode-${o.id}" placeholder="Enter customer's code" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line);">
+          <button class="primary" onclick="adminConfirmPickup('${o.id}','${o.pickup_code}')">Confirm pickup</button>
+        </div>`;
+      }
+    }
+
     return `
     <div class="card">
       <div class="top">
         <div><div class="id">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4><div class="meta">${o.fulfilment} · ${o.status}</div></div>
+        ${o.vendors?.managed_by_admin ? '<span class="pill" style="background:#EFEBE4; color:var(--ink-soft);">⚡ You manage this</span>' : ''}
         <span class="pill ${o.status==='delivered'||o.status==='picked_up'||o.status==='completed'?'approved':'done'}">${o.status}</span>
       </div>
       <div class="meta" style="margin-top:6px; padding:8px 10px; background:var(--stone); border-radius:8px;">
@@ -942,9 +1127,56 @@ function filterAndRenderOrders(){
         <button onclick="messageVendorAboutOrder('${o.vendors?.whatsapp||o.vendors?.phone||''}','${(o.vendors?.name||'').replace(/'/g,"\\'")}','${o.pickup_code}','${o.total}')">💬 Message vendor</button>
       </div>
       ${riderSection}
+      ${managedOrderActions}
       ${refundSection}
     </div>`;
   }).join('');
+}
+
+// ---- Order processing for vendors with no dashboard of their own —
+// admin does exactly what that vendor would do, from here instead. ----
+async function adminUpdateOrderStatus(orderId, status, pickupCode, fulfilment){
+  await supabaseClient.from('orders').update({ status }).eq('id', orderId);
+  notifyCustomer(orderId, status);
+  if(status === 'ready' && fulfilment === 'delivery'){
+    try {
+      await fetch('/api/notify', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ type: 'riders_new_delivery', pickupCode })
+      });
+    } catch(e){ console.error('Rider notification failed', e); }
+  }
+  await loadOrders();
+}
+
+async function adminRejectOrder(orderId, paymentMethod){
+  const reason = prompt('Why is this order being rejected? This is shown to the customer.');
+  if(reason === null) return;
+  if(!reason.trim()){ alert('A reason is required.'); return; }
+
+  await supabaseClient.from('orders').update({ status: 'rejected', rejection_reason: reason.trim() }).eq('id', orderId);
+  notifyCustomer(orderId, 'rejected');
+
+  if(paymentMethod === 'online'){
+    try {
+      const resp = await fetch('/api/refund-order', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ orderId, reason: `Order rejected: ${reason.trim()} — refunded automatically.` })
+      });
+      if(!resp.ok){ const result = await resp.json(); alert('Rejected, but the automatic refund failed: ' + (result.error || 'unknown error') + '. Please refund manually via Paystack.'); }
+    } catch(e){ alert('Rejected, but could not reach the refund service. Please refund manually via Paystack.'); }
+  }
+  await loadOrders();
+}
+
+async function adminConfirmPickup(orderId, realCode){
+  const input = document.getElementById('adminPickupCode-'+orderId);
+  const entered = (input.value || '').trim().toUpperCase();
+  if(!entered){ alert('Enter the code the customer gives you.'); return; }
+  if(entered !== String(realCode).toUpperCase()){ alert('That code doesn\'t match this order.'); return; }
+  await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
+  notifyCustomer(orderId, 'completed');
+  await loadOrders();
 }
 
 async function refundOrder(orderId, pickupCode){
