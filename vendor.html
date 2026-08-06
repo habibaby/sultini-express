@@ -949,6 +949,13 @@ async function loadOrders(){
     .from('orders').select('*').eq('vendor_id', currentVendor.id).order('created_at', {ascending:false}).limit(20);
   const el = document.getElementById('tab-orders');
   if(!orders || orders.length === 0){ el.innerHTML = '<div class="note">No orders yet.</div>'; return; }
+
+  const orderIds = orders.map(o => o.id);
+  const { data: items } = await supabaseClient
+    .from('order_items').select('*, menu_items(name)').in('order_id', orderIds);
+  const itemsByOrder = {};
+  (items || []).forEach(i => { (itemsByOrder[i.order_id] ||= []).push(i); });
+
   el.innerHTML = orders.map(o => `
     <div class="order-card">
       <div class="top">
@@ -956,6 +963,14 @@ async function loadOrders(){
         <span class="status-pill ${o.status==='ready'?'ready':(o.status==='preparing'?'preparing':'new')}">${o.status}</span>
       </div>
       <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
+      <div class="meta" style="background:var(--stone); border-radius:8px; padding:8px 10px; margin-top:6px;">
+        ${(itemsByOrder[o.id] || []).map(i => `
+          <div style="margin-bottom:4px;">
+            <strong>${i.quantity}× ${i.menu_items?.name || 'Item'}</strong>
+            ${(i.extras && i.extras.length) ? `<div style="font-size:11.5px; color:var(--ink-soft); margin-left:12px;">+ ${i.extras.map(e => e.name).join(', ')}</div>` : ''}
+          </div>
+        `).join('') || '<span style="color:var(--ink-soft);">Item details unavailable</span>'}
+      </div>
       ${o.special_instructions ? `<div class="meta" style="background:#FFF6E5; border:1px solid #F0D9A0; border-radius:8px; padding:8px 10px; margin-top:6px; font-weight:600;">📝 ${o.special_instructions}</div>` : ''}
       ${o.status==='new' ? `<div class="order-actions"><button onclick="rejectOrder('${o.id}','${o.payment_method}')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
       ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}','${o.fulfilment}')">Mark as ready</button></div>` : ''}
@@ -1050,6 +1065,15 @@ async function loadMenu(){
   const { data: items } = await supabaseClient
     .from('menu_items').select('*').eq('vendor_id', currentVendor.id);
   window.menuItems = items || [];
+
+  const { data: extras } = await supabaseClient
+    .from('menu_item_extras').select('*').eq('vendor_id', currentVendor.id).order('created_at');
+  window.menuItemExtras = {};
+  (extras || []).forEach(e => {
+    if(!window.menuItemExtras[e.menu_item_id]) window.menuItemExtras[e.menu_item_id] = [];
+    window.menuItemExtras[e.menu_item_id].push(e);
+  });
+
   renderManageItems();
 }
 function renderManageItems(){
@@ -1069,7 +1093,22 @@ function renderManageItems(){
       <div class="menu-manage-body" id="menuItemEdit-${item.id}" style="display:none;">
         <input type="text" id="editName-${item.id}" value="${item.name}" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; margin-bottom:4px;">
         <input type="text" id="editPrice-${item.id}" value="${item.vendor_target_price ?? item.price}" placeholder="How much do you want to receive?" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; margin-bottom:4px;">
-        <input type="text" id="editPromoPrice-${item.id}" value="${item.vendor_target_promo_price ?? (item.promo_price != null ? item.promo_price : '')}" placeholder="Promo amount you want to receive (optional)" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
+        <input type="text" id="editPromoPrice-${item.id}" value="${item.vendor_target_promo_price ?? (item.promo_price != null ? item.promo_price : '')}" placeholder="Promo amount you want to receive (optional)" style="width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; margin-bottom:10px;">
+
+        <div style="font-size:11.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; margin-bottom:6px;">Extras (optional add-ons)</div>
+        <div id="extrasList-${item.id}">
+          ${(window.menuItemExtras[item.id] || []).map(ex => `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); font-size:13px;">
+              <span>${ex.name} — ₦${Number(ex.price).toLocaleString()}</span>
+              <button onclick="deleteExtra('${ex.id}','${item.id}')" style="background:none; border:none; color:var(--rose-deep); font-size:12px;">Remove</button>
+            </div>
+          `).join('') || '<div style="font-size:12px; color:var(--ink-soft); padding:4px 0;">No extras yet — e.g. "Extra chicken", "Extra sauce".</div>'}
+        </div>
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <input type="text" id="newExtraName-${item.id}" placeholder="Extra name" style="flex:1.4; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
+          <input type="text" id="newExtraPrice-${item.id}" placeholder="₦ price" style="flex:0.8; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px;">
+          <button onclick="addExtra('${item.id}')" style="flex:0 0 auto; background:var(--plum); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:13px;">+ Add</button>
+        </div>
       </div>
       <button class="switch ${item.in_stock?'on':''}" onclick="toggleManageStock('${item.id}')"></button>
       <button id="editBtn-${item.id}" onclick="toggleEditItem('${item.id}')" style="background:none; border:none; color:var(--ink-soft); font-size:16px;">✎</button>
@@ -1089,6 +1128,31 @@ function toggleEditItem(id){
     editBtn.textContent = '✓';
   }
 }
+async function addExtra(itemId){
+  const nameInput = document.getElementById('newExtraName-'+itemId);
+  const priceInput = document.getElementById('newExtraPrice-'+itemId);
+  const name = nameInput.value.trim();
+  const price = priceInput.value.trim();
+  if(!name || !price || isNaN(Number(price)) || Number(price) < 0){ alert('Enter a name and a valid price for the extra.'); return; }
+
+  const { error } = await supabaseClient.from('menu_item_extras').insert([{
+    menu_item_id: itemId, vendor_id: currentVendor.id, name, price: Number(price),
+  }]);
+  if(error){ alert('Could not add extra: ' + error.message); return; }
+  nameInput.value = ''; priceInput.value = '';
+  await loadMenu();
+  // Re-open the edit view for this item since loadMenu re-renders everything closed
+  toggleEditItem(itemId);
+}
+
+async function deleteExtra(extraId, itemId){
+  if(!confirm('Remove this extra?')) return;
+  const { error } = await supabaseClient.from('menu_item_extras').delete().eq('id', extraId);
+  if(error){ alert('Could not remove: ' + error.message); return; }
+  await loadMenu();
+  toggleEditItem(itemId);
+}
+
 async function saveItemEdit(id){
   const name = document.getElementById('editName-'+id).value.trim();
   const targetPrice = document.getElementById('editPrice-'+id).value.trim();
