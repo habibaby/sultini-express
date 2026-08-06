@@ -169,7 +169,7 @@
     display:flex; align-items:flex-end;
   }
   .hero-carousel{position:absolute; inset:0; z-index:0;}
-  .hero-bg-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1.8s ease;}
+  .hero-bg-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1s ease;}
   .hero-bg-img.active{opacity:1;}
 
   /* Quiet, consistent scroll-reveal used throughout the page — the hero
@@ -213,6 +213,22 @@
   .collage-tall{grid-row:span 2; border-radius:var(--radius); overflow:hidden; aspect-ratio:1/1.25; box-shadow:0 18px 40px -14px rgba(107,80,88,0.35);}
   .collage-small{border-radius:var(--radius); overflow:hidden; aspect-ratio:1/0.85; box-shadow:0 14px 30px -12px rgba(107,80,88,0.3);}
   .hero-collage img{width:100%; height:100%; object-fit:cover;}
+
+  .dish-scroll{
+    display:flex; gap:14px; overflow-x:auto; padding:6px 20px 10px; margin:0 -20px;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  .dish-scroll::-webkit-scrollbar{display:none;}
+  .dish-card{
+    flex:0 0 auto; width:168px; text-decoration:none; display:block;
+  }
+  .dish-card img{
+    width:168px; height:168px; object-fit:cover; border-radius:18px;
+    box-shadow:0 14px 26px -14px rgba(107,80,88,0.5);
+  }
+  .dish-card .dn{ font-size:13.5px; font-weight:700; color:var(--charcoal); margin-top:8px; line-height:1.25; }
+  .dish-card .dp{ font-size:12.5px; color:var(--plum); font-weight:700; margin-top:2px; }
+  .dish-card .dv{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
 
   /* category pills */
   .cat-scroll{
@@ -491,9 +507,18 @@
     <div class="cat-pill" data-cat="Chicken">🍗 Chicken</div>
     <div class="cat-pill" data-cat="Drinks & Fura">🧉 Drinks & Fura</div>
     <div class="cat-pill" data-cat="Desserts">🍰 Desserts</div>
+  <div class="cat-pill" data-cat="Grocery">🛒 Grocery</div>
   <div class="cat-pill" data-cat="Pharmacy">💊 Pharmacy</div>
   </div>
 </div>
+
+<section id="popular-dishes" style="margin-top:8px;">
+  <div class="section-head">
+    <span class="kicker">Fresh today</span>
+    <h2>Popular right now</h2>
+  </div>
+  <div id="popularDishesScroll" class="dish-scroll"></div>
+</section>
 
 <section id="categories">
   <div class="section-head">
@@ -520,6 +545,10 @@
     <a href="#stores" class="cat-card" onclick="filterByCategory('Desserts');return false;">
       <img src="https://images.unsplash.com/photo-1555526148-5cd740b44241?auto=format&fit=crop&w=500&q=70" alt="Desserts plate">
       <span class="cat-card-label">Desserts</span>
+    </a>
+    <a href="#stores" class="cat-card" onclick="filterByCategory('Grocery');return false;">
+      <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=70" alt="Grocery shelf">
+      <span class="cat-card-label">Grocery</span>
     </a>
     <a href="#stores" class="cat-card" onclick="filterByCategory('Pharmacy');return false;">
       <img src="https://images.unsplash.com/photo-1696861286643-341a8d7a79e9?auto=format&fit=crop&w=500&q=70" alt="Pharmacy shelf">
@@ -726,7 +755,36 @@ document.querySelectorAll('.cat-pill').forEach(pill => {
   pill.addEventListener('click', () => filterByCategory(pill.dataset.cat));
 });
 
+async function loadPopularDishes(){
+  const { data: items } = await supabaseClient
+    .from('menu_items')
+    .select('id, name, price, promo_price, photo_url, vendor_id, in_stock, vendors!inner(name, status)')
+    .eq('in_stock', true)
+    .eq('vendors.status', 'approved')
+    .not('photo_url', 'is', null)
+    .limit(16);
+
+  const section = document.getElementById('popular-dishes');
+  if(!items || items.length === 0){ section.style.display = 'none'; return; }
+
+  // A little shuffle so it's not the exact same order as the homepage
+  // store grid, and so it changes visit to visit rather than feeling static.
+  const shuffled = [...items].sort(() => Math.random() - 0.5);
+
+  document.getElementById('popularDishesScroll').innerHTML = shuffled.map(item => `
+    <a href="order.html?store=${item.vendor_id}" class="dish-card">
+      <img src="${item.photo_url}" alt="${item.name}" loading="lazy">
+      <div class="dn">${item.name}</div>
+      <div class="dp">${item.promo_price != null
+        ? `<span style="text-decoration:line-through; color:var(--ink-soft); font-weight:400;">₦${Number(item.price).toLocaleString()}</span> ₦${Number(item.promo_price).toLocaleString()}`
+        : `₦${Number(item.price).toLocaleString()}`}</div>
+      <div class="dv">${item.vendors.name}</div>
+    </a>
+  `).join('');
+}
+
 loadHomepageStores();
+loadPopularDishes();
 
 // ---- Hero carousel: quiet crossfade, the one deliberate motion moment on the page ----
 (function(){
@@ -739,7 +797,7 @@ loadHomepageStores();
     slides[i].classList.remove('active');
     i = (i + 1) % slides.length;
     slides[i].classList.add('active');
-  }, 4500);
+  }, 2500);
 })();
 
 // ---- Scroll-reveal: everything else stays quiet and consistent, on purpose ----
@@ -752,7 +810,7 @@ loadHomepageStores();
   }, { threshold: 0.15 });
 
   function applyReveal(){
-    document.querySelectorAll('.cat-card, .store-card').forEach((el, idx) => {
+    document.querySelectorAll('.cat-card, .store-card, .dish-card').forEach((el, idx) => {
       if(el.classList.contains('reveal')) return; // already wired up
       el.classList.add('reveal');
       el.style.transitionDelay = (idx % 6) * 0.05 + 's';
