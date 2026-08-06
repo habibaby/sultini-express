@@ -30,13 +30,30 @@ export default async function handler(req, res) {
     const realItems = await sbGet(`menu_items?id=in.(${itemIds.join(',')})&select=id,price,promo_price,in_stock`);
     const realItemsById = Object.fromEntries(realItems.map(i => [i.id, i]));
 
+    // Same principle applies to extras — fetch the real, current price and
+    // real item ownership for every extra referenced anywhere in the order.
+    const allExtraIds = order.items.flatMap(i => (i.extras || []).map(e => e.id));
+    let realExtrasById = {};
+    if (allExtraIds.length > 0) {
+      const realExtras = await sbGet(`menu_item_extras?id=in.(${allExtraIds.join(',')})&select=id,menu_item_id,name,price`);
+      realExtrasById = Object.fromEntries(realExtras.map(e => [e.id, e]));
+    }
+
     let realSubtotal = 0;
     for (const orderedItem of order.items) {
       const real = realItemsById[orderedItem.menuItemId];
       if (!real) return res.status(400).json({ error: 'One of the items in your cart no longer exists — please refresh and try again.' });
       if (!real.in_stock) return res.status(400).json({ error: 'One of the items in your cart just went out of stock — please refresh and try again.' });
       const realPrice = (real.promo_price != null && Number(real.promo_price) < Number(real.price)) ? Number(real.promo_price) : Number(real.price);
-      realSubtotal += realPrice * orderedItem.qty;
+      let realExtrasTotal = 0;
+      for (const claimedExtra of (orderedItem.extras || [])) {
+        const realExtra = realExtrasById[claimedExtra.id];
+        if (!realExtra || realExtra.menu_item_id !== orderedItem.menuItemId) {
+          return res.status(400).json({ error: 'One of the selected extras is no longer available — please refresh your cart and try again.' });
+        }
+        realExtrasTotal += Number(realExtra.price);
+      }
+      realSubtotal += (realPrice + realExtrasTotal) * orderedItem.qty;
     }
 
     let realDeliveryFee = 0;
@@ -138,6 +155,10 @@ export default async function handler(req, res) {
           menu_item_id: i.menuItemId,
           quantity: i.qty,
           price_at_order: i.price,
+          extras: (i.extras || []).map(e => {
+            const real = realExtrasById[e.id];
+            return real ? { name: real.name, price: Number(real.price) } : null;
+          }).filter(Boolean),
         }))
       ),
     });
