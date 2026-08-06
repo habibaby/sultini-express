@@ -181,6 +181,10 @@
 
   <div class="field"><label>Store name</label><input type="text" id="newVdName"></div>
   <div class="field">
+    <label>City</label>
+    <select id="newVdCity" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select>
+  </div>
+  <div class="field">
     <label>Category</label>
     <select id="newVdCategory" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select>
   </div>
@@ -273,6 +277,10 @@
 
   <div class="section-label">Store details</div>
   <div class="field"><label>Name</label><input type="text" id="vdName"></div>
+  <div class="field">
+    <label>City</label>
+    <select id="vdCitySelect" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select>
+  </div>
   <div class="field"><label>Category</label><select id="vdCategorySelect" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select></div>
   <div class="field-row">
     <div class="field"><label>Phone</label><input type="text" id="vdPhone"></div>
@@ -637,6 +645,7 @@ document.getElementById('newVdCategory').innerHTML = VENDOR_CATEGORIES.map(c => 
 
 async function createAdminManagedVendor(){
   const name = document.getElementById('newVdName').value.trim();
+  const city = document.getElementById('newVdCity').value || 'Sokoto';
   const category = document.getElementById('newVdCategory').value;
   const phone = document.getElementById('newVdPhone').value.trim();
   const whatsapp = document.getElementById('newVdWhatsapp').value.trim();
@@ -647,7 +656,7 @@ async function createAdminManagedVendor(){
 
   resultEl.style.color = 'var(--ink-soft)'; resultEl.textContent = 'Creating…';
   const { data, error } = await supabaseClient.from('vendors').insert([{
-    name, category, phone, whatsapp: whatsapp || phone, address,
+    name, city, category, phone, whatsapp: whatsapp || phone, address,
     status: 'approved', managed_by_admin: true, owner_id: null,
   }]).select().single();
 
@@ -684,7 +693,7 @@ async function viewVendorDetail(id){
   document.getElementById('vdLocationResult').innerHTML = (v.lat != null)
     ? '✅ Location already confirmed.'
     : '⚠️ Not confirmed yet — this store\'s deliveries use the standard fallback fee until it is.';
-  initMapPicker('admin', 'adminMapPicker', v.lat, v.lng);
+  initMapPicker('admin', 'adminMapPicker', v.lat, v.lng, v.city?.toLowerCase());
   document.getElementById('vdDeliveryMinutes').value = v.avg_delivery_minutes || 25;
   document.getElementById('vdOpeningTime').value = v.opening_time || '';
   document.getElementById('vdClosingTime').value = v.closing_time || '';
@@ -693,6 +702,8 @@ async function viewVendorDetail(id){
   renderVendorManagedByAdminToggle(v);
   document.getElementById('vdCategorySelect').innerHTML = VENDOR_CATEGORIES.map(c =>
     `<option value="${c}" ${c===v.category?'selected':''}>${c}</option>`).join('');
+  document.getElementById('vdCitySelect').innerHTML = ACTIVE_CITIES.map(c =>
+    `<option value="${c.name}" ${c.name===v.city?'selected':''}>${c.name}</option>`).join('');
 
   await loadVendorSharePct();
   const { data: menuItems } = await supabaseClient.from('menu_items').select('*').eq('vendor_id', id);
@@ -765,17 +776,30 @@ async function toggleVendorManagedByAdmin(){
 // ---- Map picker: type an address to jump there, then drag the pin to
 // the exact spot. The FINAL PIN POSITION is what gets saved.
 const mapPickers = {};
-const SOKOTO_CENTER = { lat: 13.0059, lng: 5.2476 };
 const mapPickerAddressInputs = { admin: 'vdAddress' };
+let ACTIVE_CITIES = [];
+let CITY_CENTERS = {};
+
+async function loadActiveCities(){
+  const { data } = await supabaseClient.from('cities').select('*').eq('is_active', true).order('name');
+  ACTIVE_CITIES = data || [];
+  CITY_CENTERS = Object.fromEntries(ACTIVE_CITIES.map(c => [c.id, { lat: Number(c.center_lat), lng: Number(c.center_lng) }]));
+  const select = document.getElementById('newVdCity');
+  if(select){
+    select.innerHTML = ACTIVE_CITIES.map(c => `<option value="${c.name}" data-id="${c.id}">${c.name}</option>`).join('');
+  }
+}
+loadActiveCities();
 
 function waitForGoogleMaps(cb){
   if(window.google && window.google.maps) cb();
   else setTimeout(() => waitForGoogleMaps(cb), 200);
 }
 
-function initMapPicker(name, containerId, initialLat, initialLng){
+function initMapPicker(name, containerId, initialLat, initialLng, cityId){
   waitForGoogleMaps(() => {
-    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : SOKOTO_CENTER;
+    const fallbackCenter = CITY_CENTERS[cityId] || CITY_CENTERS['sokoto'] || { lat: 13.0059, lng: 5.2476 };
+    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : fallbackCenter;
     const map = new google.maps.Map(document.getElementById(containerId), {
       center, zoom: initialLat != null ? 16 : 13, streetViewControl:false, mapTypeControl:false, fullscreenControl:false
     });
@@ -789,9 +813,12 @@ async function jumpMapToAddress(name){
   const address = document.getElementById(inputId).value.trim();
   if(!address || !mapPickers[name]) return;
   try {
+    const cityId = window.currentDetailVendorId
+      ? (allVendorsData.find(x => x.id === currentDetailVendorId)?.city?.toLowerCase() || 'sokoto')
+      : (document.getElementById('newVdCity')?.selectedOptions[0]?.dataset.id || 'sokoto');
     const resp = await fetch('/api/geocode', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'geocode', address })
+      body: JSON.stringify({ action: 'geocode', address, city: cityId })
     });
     const result = await resp.json();
     if(!resp.ok) return;
@@ -987,6 +1014,7 @@ async function changeVendorPhoto(inputEl){
 async function saveVendorDetail(){
   const updates = {
     name: document.getElementById('vdName').value.trim(),
+    city: document.getElementById('vdCitySelect').value,
     category: document.getElementById('vdCategorySelect').value,
     phone: document.getElementById('vdPhone').value.trim(),
     whatsapp: document.getElementById('vdWhatsapp').value.trim(),
