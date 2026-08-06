@@ -85,7 +85,25 @@
   .qty-control button{width:28px; height:28px; border-radius:8px; border:1.5px solid var(--rose); background:#fff; color:var(--rose); font-weight:700; font-size:15px;}
   .qty-control span{font-size:14px; font-weight:700; min-width:16px; text-align:center;}
 
-  .cart-bar{position:fixed; left:18px; right:18px; bottom:16px; z-index:50; background:var(--plum); color:#fff; border-radius:16px; padding:14px 18px; display:none; align-items:center; justify-content:space-between; box-shadow:0 12px 30px -10px rgba(62,46,51,0.5); max-width:604px; margin:0 auto;}
+  .cart-bar{position:fixed; left:18px; right:18px; bottom:76px; z-index:50; background:var(--plum); color:#fff; border-radius:16px; padding:14px 18px; display:none; align-items:center; justify-content:space-between; box-shadow:0 12px 30px -10px rgba(62,46,51,0.5); max-width:604px; margin:0 auto;}
+
+  .bottom-nav{
+    position:fixed; bottom:0; left:0; right:0; z-index:60;
+    background:#fff; border-top:1px solid var(--line);
+    display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 16px rgba(107,80,88,0.06);
+  }
+  .bottom-nav a, .bottom-nav button{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:10.5px; font-weight:600; color:var(--ink-soft); padding:4px 0;
+    background:none; border:none; cursor:pointer; font-family:inherit;
+  }
+  .bottom-nav a.active, .bottom-nav button.active{color:var(--rose-deep);}
+  .bottom-nav .ico{width:20px; height:20px; border-radius:6px; background:currentColor; opacity:0.15;}
+  .bottom-nav a.active .ico, .bottom-nav button.active .ico{opacity:1; background:var(--rose-deep);}
+  @media (min-width:760px){ .bottom-nav{display:none;} .cart-bar{bottom:16px;} }
+  body{ padding-bottom:70px; }
+  @media (min-width:760px){ body{ padding-bottom:0; } }
   .cart-bar.show{display:flex;}
 
   .cart-item{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); align-items:center;}
@@ -848,7 +866,17 @@ async function loadStores(){
     return;
   }
 
-  const vendorIds = vendors.map(v => v.id);
+  // Same city the customer picked on the homepage — carried through via
+  // localStorage so switching pages doesn't silently show every city again.
+  const selectedCity = localStorage.getItem('sultini_selected_city');
+  const cityVendors = selectedCity ? vendors.filter(v => v.city === selectedCity) : vendors;
+  if (cityVendors.length === 0) {
+    document.getElementById('storeList').innerHTML =
+      `<div class="empty-state"><div class="icon">🏪</div>No stores live in ${selectedCity} yet.</div>`;
+    return;
+  }
+
+  const vendorIds = cityVendors.map(v => v.id);
   const { data: menuItems } = await supabaseClient
     .from('menu_items')
     .select('*')
@@ -858,7 +886,14 @@ async function loadStores(){
     (menuByVendor[m.vendor_id] ||= []).push(m);
   });
 
-  STORES = vendors.map(v => {
+  const itemIds = (menuItems || []).map(m => m.id);
+  const { data: allExtras } = itemIds.length
+    ? await supabaseClient.from('menu_item_extras').select('*').in('menu_item_id', itemIds)
+    : { data: [] };
+  const extrasByItem = {};
+  (allExtras || []).forEach(e => { (extrasByItem[e.menu_item_id] ||= []).push(e); });
+
+  STORES = cityVendors.map(v => {
     const items = menuByVendor[v.id] || [];
     return {
       id: v.id,
@@ -874,7 +909,8 @@ async function loadStores(){
       menu: items.map(m => ({
         id: m.id, name: m.name, desc: m.description, price: Number(m.price),
         promoPrice: m.promo_price != null ? Number(m.promo_price) : null,
-        img: m.photo_url, inStock: m.in_stock
+        img: m.photo_url, inStock: m.in_stock,
+        extras: (extrasByItem[m.id] || []).map(e => ({ id: e.id, name: e.name, price: Number(e.price) }))
       }))
     };
   });
@@ -998,14 +1034,25 @@ function renderMenu(){
 
 function renderMenuItem(item){
   const qty = cart[item.id] ? cart[item.id].qty : 0;
-  const control = !item.inStock
-    ? `<span class="add-btn disabled">＋</span>`
-    : qty === 0
-      ? `<button class="add-btn" onclick="addToCart('${item.id}')">＋</button>`
-      : `<div class="qty-control"><button onclick="changeQty('${item.id}',-1)">−</button><span>${qty}</span><button onclick="changeQty('${item.id}',1)">＋</button></div>`;
+  const hasExtras = item.extras && item.extras.length > 0;
+  let control;
+  if(!item.inStock){
+    control = `<span class="add-btn disabled">＋</span>`;
+  } else if(hasExtras){
+    // Items with extras always open the customize panel — even repeat taps —
+    // since each add could have a different combination selected.
+    control = `<button class="add-btn" onclick="toggleExtrasPanel('${item.id}')">＋</button>`;
+  } else if(qty === 0){
+    control = `<button class="add-btn" onclick="addToCart('${item.id}')">＋</button>`;
+  } else {
+    control = `<div class="qty-control"><button onclick="changeQty('${item.id}',-1)">−</button><span>${qty}</span><button onclick="changeQty('${item.id}',1)">＋</button></div>`;
+  }
   const priceDisplay = item.promoPrice != null
     ? `<div class="price"><span style="text-decoration:line-through; color:var(--ink-soft); font-weight:400; font-size:12px;">₦${item.price.toLocaleString()}</span> ₦${item.promoPrice.toLocaleString()} <span style="background:var(--rose-deep); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:8px; vertical-align:middle;">PROMO</span></div>`
     : `<div class="price">₦${item.price.toLocaleString()}</div>`;
+  const cartLinesForItem = Object.values(cart).filter(c => c.item.id === item.id && c.selectedExtras && c.selectedExtras.length);
+  const extrasSummary = cartLinesForItem.length
+    ? `<div style="font-size:11px; color:var(--rose-deep); margin-top:4px;">${cartLinesForItem.length} customized ${cartLinesForItem.length > 1 ? 'orders' : 'order'} in cart</div>` : '';
   return `
     <div class="menu-item">
       <img src="${item.img}" alt="${item.name}">
@@ -1014,9 +1061,53 @@ function renderMenuItem(item){
         <div class="desc">${item.desc || ''}</div>
         ${priceDisplay}
         <span class="stock-badge ${item.inStock?'in':'out'}">${item.inStock?'In stock':'Out of stock'}</span>
+        ${extrasSummary}
+        ${hasExtras ? `
+          <div id="extrasPanel-${item.id}" style="display:none; margin-top:10px; padding:10px; background:var(--stone); border-radius:10px;">
+            <div style="font-size:11.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; margin-bottom:6px;">Add extras</div>
+            ${item.extras.map(ex => `
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; cursor:pointer;">
+                <input type="checkbox" class="extra-check-${item.id}" value="${ex.id}" data-name="${ex.name}" data-price="${ex.price}">
+                <span>${ex.name} <span style="color:var(--ink-soft);">+₦${ex.price.toLocaleString()}</span></span>
+              </label>
+            `).join('')}
+            <button class="add-btn" style="width:auto; padding:8px 16px; margin-top:8px; border-radius:10px;" onclick="addToCartWithExtras('${item.id}')">Add to cart</button>
+          </div>
+        ` : ''}
       </div>
       ${control}
     </div>`;
+}
+
+function toggleExtrasPanel(itemId){
+  const panel = document.getElementById('extrasPanel-'+itemId);
+  if(panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function addToCartWithExtras(itemId){
+  const avail = getStoreAvailability(currentStore);
+  if(!avail.open){ alert(avail.message); return; }
+  const item = currentStore.menu.find(i=>i.id===itemId);
+  const existingVendorIds = new Set(Object.values(cart).map(c => c.store.id));
+  if(existingVendorIds.size > 0 && !existingVendorIds.has(currentStore.id)){
+    const existingStoreName = Object.values(cart)[0].store.name;
+    const confirmSwitch = confirm(`Your cart has items from ${existingStoreName}. Each order can only come from one store — clear your cart and start a new order from ${currentStore.name}?`);
+    if(!confirmSwitch) return;
+    cart = {};
+  }
+
+  const checked = document.querySelectorAll('.extra-check-'+itemId+':checked');
+  const selectedExtras = Array.from(checked).map(c => ({ id: c.value, name: c.dataset.name, price: Number(c.dataset.price) }));
+  const extraKey = selectedExtras.map(e => e.id).sort().join(',');
+  const cartKey = extraKey ? `${itemId}::${extraKey}` : itemId;
+
+  if(cart[cartKey]) cart[cartKey].qty += 1;
+  else cart[cartKey] = { item, store: currentStore, qty: 1, selectedExtras };
+
+  document.getElementById('extrasPanel-'+itemId).style.display = 'none';
+  document.querySelectorAll('.extra-check-'+itemId).forEach(c => c.checked = false);
+  renderMenu();
+  refreshCartBar();
 }
 
 function addToCart(itemId){
@@ -1034,19 +1125,23 @@ function addToCart(itemId){
   renderMenu();
   refreshCartBar();
 }
-function changeQty(itemId, delta){
-  if(!cart[itemId]) return;
-  cart[itemId].qty += delta;
-  if(cart[itemId].qty <= 0) delete cart[itemId];
+function changeQty(cartKey, delta){
+  if(!cart[cartKey]) return;
+  cart[cartKey].qty += delta;
+  if(cart[cartKey].qty <= 0) delete cart[cartKey];
   renderMenu();
   refreshCartBar();
 }
 function effectivePrice(item){
   return (item.promoPrice != null && item.promoPrice < item.price) ? item.promoPrice : item.price;
 }
+function cartLineUnitPrice(cartEntry){
+  const extrasTotal = (cartEntry.selectedExtras || []).reduce((sum, e) => sum + e.price, 0);
+  return effectivePrice(cartEntry.item) + extrasTotal;
+}
 function cartTotals(){
   let count=0, subtotal=0;
-  Object.values(cart).forEach(c=>{ count+=c.qty; subtotal += c.qty*effectivePrice(c.item); });
+  Object.values(cart).forEach(c=>{ count+=c.qty; subtotal += c.qty*cartLineUnitPrice(c); });
   return {count, subtotal};
 }
 function refreshCartBar(){
@@ -1065,19 +1160,23 @@ function refreshCartBar(){
 
 function renderCartScreen(){
   const el = document.getElementById('cartItemsContainer');
-  const entries = Object.values(cart);
+  const entries = Object.entries(cart);
   if(entries.length===0){
     el.innerHTML = `<div class="empty-cart">🛍<br>Your cart is empty.</div>`;
     document.getElementById('toCheckoutBtn').classList.add('disabled');
     return;
   }
   document.getElementById('toCheckoutBtn').classList.remove('disabled');
-  el.innerHTML = entries.map(c=>`
+  el.innerHTML = entries.map(([cartKey, c])=>{
+    const extrasLine = (c.selectedExtras && c.selectedExtras.length)
+      ? `<div style="font-size:11.5px; color:var(--ink-soft); margin-top:2px;">+ ${c.selectedExtras.map(e => e.name).join(', ')}</div>` : '';
+    return `
     <div class="cart-item">
       <img src="${c.item.img}" alt="${c.item.name}">
-      <div class="cart-item-body"><h4>${c.item.name}</h4><div class="price">₦${effectivePrice(c.item).toLocaleString()} · ${c.store.name}</div></div>
-      <div class="qty-control"><button onclick="changeQty('${c.item.id}',-1); renderCartScreen();">−</button><span>${c.qty}</span><button onclick="changeQty('${c.item.id}',1); renderCartScreen();">＋</button></div>
-    </div>`).join('');
+      <div class="cart-item-body"><h4>${c.item.name}</h4><div class="price">₦${cartLineUnitPrice(c).toLocaleString()} · ${c.store.name}</div>${extrasLine}</div>
+      <div class="qty-control"><button onclick="changeQty('${cartKey}',-1); renderCartScreen();">−</button><span>${c.qty}</span><button onclick="changeQty('${cartKey}',1); renderCartScreen();">＋</button></div>
+    </div>`;
+  }).join('');
 }
 
 function updatePayOptions(){
@@ -1244,7 +1343,10 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   const orderPayload = {
     vendorId,
     customerId: session ? session.user.id : null,
-    items: Object.values(cart).map(c => ({ menuItemId: c.item.id, qty: c.qty, price: effectivePrice(c.item) })),
+    items: Object.values(cart).map(c => ({
+      menuItemId: c.item.id, qty: c.qty, price: effectivePrice(c.item),
+      extras: (c.selectedExtras || []).map(e => ({ id: e.id, name: e.name, price: e.price }))
+    })),
     fulfilment,
     deliveryFee,
     subtotal,
@@ -1392,6 +1494,18 @@ const urlParams = new URLSearchParams(window.location.search);
 if(urlParams.get('screen') === 'account'){
   renderAccountScreen();
   showScreen('screen-account', true);
+}
+</script>
+
+<nav class="bottom-nav">
+  <a href="index.html"><span class="ico"></span>Home</a>
+  <button id="navBrowse" class="active" onclick="showScreen('screen-browse', false); updateBottomNav('navBrowse');"><span class="ico"></span>Browse</button>
+  <button id="navCart" onclick="renderCartScreen(); showScreen('screen-cart', true); updateBottomNav('navCart');"><span class="ico"></span>Cart</button>
+  <button id="navAccount" onclick="showScreen('screen-account', true); updateBottomNav('navAccount');"><span class="ico"></span>Account</button>
+</nav>
+<script>
+function updateBottomNav(activeId){
+  document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.id === activeId));
 }
 </script>
 </body>
