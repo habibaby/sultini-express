@@ -135,6 +135,7 @@ export default async function handler(req, res) {
         subtotal: order.subtotal,
         delivery_fee: order.deliveryFee || 0,
         delivery_lat: order.deliveryLat || null,
+        special_instructions: order.specialInstructions || null,
         delivery_lng: order.deliveryLng || null,
         total: order.total,
         payment_method: 'online',
@@ -221,21 +222,19 @@ export default async function handler(req, res) {
       console.error('Notification failed', notifyErr);
     }
 
-    // Notify the vendor too — they previously had no way to know a
-    // new order came in except by manually checking their dashboard
+    // Notify the vendor too — SMS now, not email, since vendors are on
+    // the move and often don't check email promptly
     try {
-      const vendorRes = await sb(`vendors?id=eq.${order.vendorId}&select=email,name`);
+      const vendorRes = await sb(`vendors?id=eq.${order.vendorId}&select=name`);
       const vendorRows = await vendorRes.json();
-      const vendorEmail = vendorRows && vendorRows[0] && vendorRows[0].email;
-      if (vendorEmail) {
-        await fetch('https://api.resend.com/emails', {
+      if (vendorRows && vendorRows[0]) {
+        await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from: 'Sultini Express <notifications@sultini.com>',
-            to: [vendorEmail],
-            subject: `New order: ${pickupCode}`,
-            text: `You have a new order (${pickupCode}) worth ₦${order.total}. Log into your vendor dashboard to accept it.`,
+            type: 'vendor',
+            vendorId: order.vendorId,
+            message: `New order ${pickupCode} on Sultini Express, worth ₦${order.total}. Log into your dashboard to accept it.`,
           }),
         });
       }
