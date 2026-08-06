@@ -15,7 +15,7 @@
 const STATUS_MESSAGES = {
   rejected: {
     subject: "Your order couldn't be accepted",
-    text: (code) => `Unfortunately the store wasn't able to accept your order ${code}. If you paid online, please contact Sultini Express support about a refund.`,
+    text: (code, reason) => `Unfortunately the store wasn't able to accept your order ${code}.${reason ? ` Reason given: ${reason}.` : ''} If you paid online, this has been refunded automatically.`,
   },
   preparing: {
     subject: 'Your order is being prepared',
@@ -51,6 +51,34 @@ async function sendEmail(to, subject, text) {
   });
 }
 
+// Vendors and riders get SMS, not email — they're on the move and often
+// don't check email. Admin and customers stay on email. Needs
+// TERMII_API_KEY and an approved TERMII_SENDER_ID to actually send;
+// until those are set, this fails loudly in the logs but never blocks
+// the order/notification flow that called it.
+async function sendSMS(phone, message) {
+  const apiKey = process.env.TERMII_API_KEY;
+  const senderId = process.env.TERMII_SENDER_ID || 'Sultini';
+  if (!apiKey) {
+    console.error('TERMII_API_KEY not set — SMS not sent to', phone);
+    return { skipped: true, reason: 'no_api_key' };
+  }
+  const digits = (phone || '').replace(/\D/g, '');
+  const intl = digits.startsWith('234') ? digits : '234' + digits.replace(/^0/, '');
+
+  const res = await fetch('https://api.ng.termii.com/api/sms/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: intl, from: senderId, sms: message,
+      type: 'plain', channel: 'generic', api_key: apiKey,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) console.error('Termii SMS failed:', data);
+  return data;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -63,6 +91,19 @@ export default async function handler(req, res) {
 
   try {
     // ---- Admin notification: simple subject/message, e.g. new vendor application ----
+    // ---- Welcome email: sent right after a new customer account is created ----
+    if (type === 'welcome') {
+      const { email, name } = req.body;
+      if (!email) return res.status(400).json({ error: 'Missing email' });
+      const firstName = (name || '').split(' ')[0] || 'there';
+      await sendEmail(
+        email,
+        'Welcome to Sultini Express 🎉',
+        `Hi ${firstName},\n\nWelcome to Sultini Express — Sokoto's food and pharmacy delivery platform. Your account is ready.\n\nBrowse local restaurants, grills, and pharmacies, order for delivery or pickup, and track your order in real time from the moment it's placed.\n\nReady when you are: sultini.com\n\n— The Sultini Express team`
+      );
+      return res.status(200).json({ success: true });
+    }
+
     if (type === 'admin') {
       const { subject, message } = req.body;
       if (!subject || !message) return res.status(400).json({ error: 'Missing subject or message' });
@@ -78,30 +119,55 @@ export default async function handler(req, res) {
       const template = STATUS_MESSAGES[status];
       if (!template) return res.status(200).json({ skipped: true }); // not every status needs an email
 
-      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,customer_email`, { headers: sbHeaders });
+      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,customer_email,rejection_reason`, { headers: sbHeaders });
       const orders = await orderRes.json();
       const order = orders && orders[0];
       if (!order || !order.customer_email) return res.status(200).json({ skipped: true, reason: 'No customer email on file' });
 
-      await sendEmail(order.customer_email, `Sultini Express: ${template.subject}`, template.text(order.pickup_code));
+      await sendEmail(order.customer_email, `Sultini Express: ${template.subject}`, template.text(order.pickup_code, order.rejection_reason));
       return res.status(200).json({ success: true });
     }
 
-    // ---- Rider notification: new delivery available for anyone to claim ----
+    // ---- Vendor notification: new order came in — SMS, not email ----
+    if (type === 'vendor') {
+      const { vendorId, message } = req.body;
+      if (!vendorId || !message) return res.status(400).json({ error: 'Missing vendorId or message' });
+
+      const vendorRes = await fetch(`${SUPABASE_URL}/rest/v1/vendors?id=eq.${vendorId}&select=name,phone,managed_by_admin`, { headers: sbHeaders });
+      const vendors = await vendorRes.json();
+      const vendor = vendors && vendors[0];
+      if (!vendor) return res.status(200).json({ skipped: true, reason: 'Vendor not found' });
+
+      // Vendors you manage yourself have no dashboard of their own — the
+      // order notification needs to reach you instead, not them, with
+      // enough context to know which store it's actually for.
+      if (vendor.managed_by_admin) {
+        const adminMessage = `[${vendor.name}] ${message}`;
+        const smsResult = await sendSMS('2347033580395', adminMessage);
+        await sendEmail('sultiniexpress@yahoo.com', `Sultini: New order for ${vendor.name}`, adminMessage);
+        return res.status(200).json({ success: true, routedToAdmin: true, smsResult });
+      }
+
+      if (!vendor.phone) return res.status(200).json({ skipped: true, reason: 'No phone number on file for this vendor' });
+      const result = await sendSMS(vendor.phone, message);
+      return res.status(200).json({ success: true, result });
+    }
+
+    // ---- Rider notification: new delivery available for anyone to claim — SMS, not email ----
     if (type === 'riders_new_delivery') {
       const { pickupCode } = req.body;
       if (!pickupCode) return res.status(400).json({ error: 'Missing pickupCode' });
 
-      const ridersRes = await fetch(`${SUPABASE_URL}/rest/v1/riders?active=eq.true&select=email`, { headers: sbHeaders });
+      const ridersRes = await fetch(`${SUPABASE_URL}/rest/v1/riders?active=eq.true&select=phone`, { headers: sbHeaders });
       const riders = await ridersRes.json();
-      const emails = (riders || []).map(r => r.email).filter(Boolean);
-      if (emails.length === 0) return res.status(200).json({ skipped: true, reason: 'No active riders with an email on file' });
+      const phones = (riders || []).map(r => r.phone).filter(Boolean);
+      if (phones.length === 0) return res.status(200).json({ skipped: true, reason: 'No active riders with a phone on file' });
 
-      await Promise.all(emails.map(email =>
-        sendEmail(email, 'New delivery available', `A new delivery (order ${pickupCode}) is ready and needs a rider. Log into your Sultini rider dashboard to accept it.`)
-          .catch(e => console.error('Failed to notify', email, e))
+      await Promise.all(phones.map(phone =>
+        sendSMS(phone, `New delivery available (order ${pickupCode}). Log into your Sultini rider dashboard to accept it.`)
+          .catch(e => console.error('Failed to notify', phone, e))
       ));
-      return res.status(200).json({ success: true, notified: emails.length });
+      return res.status(200).json({ success: true, notified: phones.length });
     }
 
     return res.status(400).json({ error: `Unknown notification type: ${type}` });
