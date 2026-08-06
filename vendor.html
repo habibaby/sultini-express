@@ -210,6 +210,7 @@
       <button class="cat-select" data-cat="Chicken">🍗 Chicken</button>
       <button class="cat-select" data-cat="Drinks & Fura">🧉 Drinks & Fura</button>
       <button class="cat-select" data-cat="Desserts">🍰 Desserts</button>
+      <button class="cat-select" data-cat="Grocery">🛒 Grocery</button>
       <button class="cat-select" data-cat="Pharmacy">💊 Pharmacy</button>
     </div>
   </div>
@@ -908,6 +909,7 @@ async function loadOrders(){
         <span class="status-pill ${o.status==='ready'?'ready':(o.status==='preparing'?'preparing':'new')}">${o.status}</span>
       </div>
       <div class="order-items">${o.fulfilment} ${o.pickup_time_choice ? '· '+o.pickup_time_choice : ''}</div>
+      ${o.special_instructions ? `<div class="meta" style="background:#FFF6E5; border:1px solid #F0D9A0; border-radius:8px; padding:8px 10px; margin-top:6px; font-weight:600;">📝 ${o.special_instructions}</div>` : ''}
       ${o.status==='new' ? `<div class="order-actions"><button onclick="rejectOrder('${o.id}','${o.payment_method}')">Reject</button><button class="primary" onclick="updateOrderStatus('${o.id}','preparing')">Accept order</button></div>` : ''}
       ${o.status==='preparing' ? `<div class="order-actions"><button class="primary" onclick="updateOrderStatus('${o.id}','ready','${o.pickup_code}','${o.fulfilment}')">Mark as ready</button></div>` : ''}
       ${o.status==='ready' && o.fulfilment==='pickup' ? `
@@ -926,9 +928,11 @@ async function loadOrders(){
 // a rejected order is, by definition, one the customer never received.
 // Cash-on-delivery orders need no refund since no money was ever taken.
 async function rejectOrder(orderId, paymentMethod){
-  if(!confirm('Reject this order? If it was paid online, the customer will be refunded automatically.')) return;
+  const reason = prompt('Why are you rejecting this order? This is shown to the customer, so please be specific (e.g. "Out of stock", "Kitchen closed early").');
+  if(reason === null) return; // they cancelled the prompt
+  if(!reason.trim()){ alert('A reason is required — customers deserve to know why their order was rejected.'); return; }
 
-  await supabaseClient.from('orders').update({ status: 'rejected' }).eq('id', orderId);
+  await supabaseClient.from('orders').update({ status: 'rejected', rejection_reason: reason.trim() }).eq('id', orderId);
   notifyCustomer(orderId, 'rejected');
 
   if(paymentMethod === 'online'){
@@ -936,7 +940,7 @@ async function rejectOrder(orderId, paymentMethod){
       const resp = await fetch('/api/refund-order', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ orderId, reason: 'Order rejected by vendor — refunded automatically, no charge applies.' })
+        body: JSON.stringify({ orderId, reason: `Order rejected by vendor: ${reason.trim()} — refunded automatically, no charge applies.` })
       });
       if(!resp.ok){
         const result = await resp.json();
