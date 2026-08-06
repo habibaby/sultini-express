@@ -1112,6 +1112,24 @@ function filterAndRenderOrders(){
       }
     }
 
+    // For deliveries being handled by someone outside the Sultini rider
+    // system entirely — an external dispatch partner, or covering for your
+    // own rider in an emergency. They won't have the rider app, so this
+    // lets you move the delivery forward on their behalf.
+    let externalRiderActions = '';
+    if(o.fulfilment === 'delivery'){
+      if(o.status === 'out_for_delivery'){
+        externalRiderActions = `<div class="row-actions" style="margin-top:6px;">
+          <button class="primary" onclick="adminMarkPickedUp('${o.id}')">Mark picked up from store</button>
+        </div>`;
+      } else if(o.status === 'picked_up'){
+        externalRiderActions = `<div class="row-actions" style="margin-top:6px;">
+          <input type="text" id="adminDeliveryCode-${o.id}" placeholder="Enter customer's code" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line);">
+          <button class="primary" onclick="adminMarkDelivered('${o.id}','${o.pickup_code}')">Confirm delivered</button>
+        </div>`;
+      }
+    }
+
     return `
     <div class="card">
       <div class="top">
@@ -1129,6 +1147,7 @@ function filterAndRenderOrders(){
       </div>
       ${riderSection}
       ${managedOrderActions}
+      ${externalRiderActions}
       ${refundSection}
     </div>`;
   }).join('');
@@ -1177,6 +1196,22 @@ async function adminConfirmPickup(orderId, realCode){
   if(entered !== String(realCode).toUpperCase()){ alert('That code doesn\'t match this order.'); return; }
   await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
   notifyCustomer(orderId, 'completed');
+  await loadOrders();
+}
+
+async function adminMarkPickedUp(orderId){
+  await supabaseClient.from('orders').update({ status: 'picked_up' }).eq('id', orderId);
+  notifyCustomer(orderId, 'picked_up');
+  await loadOrders();
+}
+
+async function adminMarkDelivered(orderId, realCode){
+  const input = document.getElementById('adminDeliveryCode-'+orderId);
+  const entered = (input.value || '').trim().toUpperCase();
+  if(!entered){ alert('Enter the code the customer gives the rider.'); return; }
+  if(entered !== String(realCode).toUpperCase()){ alert('That code doesn\'t match this order — double-check with the customer before confirming.'); return; }
+  await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+  notifyCustomer(orderId, 'delivered');
   await loadOrders();
 }
 
