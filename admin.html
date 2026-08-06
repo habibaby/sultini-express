@@ -632,7 +632,7 @@ function computeListedPrice(targetAmount){
   return Math.round(raw / 10) * 10;
 }
 loadVendorSharePct();
-const VENDOR_CATEGORIES = ['Local dishes','Grills & Suya','Chicken','Drinks & Fura','Desserts','Pharmacy'];
+const VENDOR_CATEGORIES = ['Local dishes','Grills & Suya','Chicken','Drinks & Fura','Desserts','Grocery','Pharmacy'];
 document.getElementById('newVdCategory').innerHTML = VENDOR_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
 
 async function createAdminManagedVendor(){
@@ -1123,6 +1123,7 @@ function filterAndRenderOrders(){
         <strong>${o.guest_name || 'Customer'}</strong>${o.guest_phone ? ` · ${o.guest_phone}` : ''}${o.customer_email ? ` · ${o.customer_email}` : ''}
         ${o.fulfilment === 'delivery' && o.delivery_address ? `<br>📍 ${o.delivery_address}` : ''}
       </div>
+      ${o.special_instructions ? `<div class="meta" style="background:#FFF6E5; border:1px solid #F0D9A0; border-radius:8px; padding:8px 10px; margin-top:6px; font-weight:600;">📝 ${o.special_instructions}</div>` : ''}
       <div class="row-actions" style="margin-top:6px;">
         <button onclick="messageVendorAboutOrder('${o.vendors?.whatsapp||o.vendors?.phone||''}','${(o.vendors?.name||'').replace(/'/g,"\\'")}','${o.pickup_code}','${o.total}')">💬 Message vendor</button>
       </div>
