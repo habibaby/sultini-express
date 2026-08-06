@@ -45,11 +45,14 @@ export default async function handler(req, res) {
 
   // ---------- Turn an address into coordinates ----------
   if (action === 'geocode') {
-    const { address } = req.body;
+    const { address, city } = req.body;
     if (!address || !address.trim()) return res.status(400).json({ error: 'Missing address' });
     try {
-      // Biased toward Sokoto so short/ambiguous addresses resolve correctly
-      const query = `${address}, Sokoto, Nigeria`;
+      // Biased toward the relevant city so short/ambiguous addresses
+      // resolve correctly — this used to be hardcoded to Sokoto, which
+      // would have quietly mis-resolved every Kaduna address.
+      const cityLabel = city ? city.charAt(0).toUpperCase() + city.slice(1) : 'Sokoto';
+      const query = `${address}, ${cityLabel}, Nigeria`;
       const geoRes = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}`
       );
