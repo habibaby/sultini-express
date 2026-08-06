@@ -7,7 +7,6 @@
 <meta name="description" content="Order food and pharmacy essentials for delivery across Sokoto and Kaduna. Local dishes, grills, drinks, desserts, and medicine from the best local stores — track your order live or pick up yourself.">
 <link rel="canonical" href="https://sultini.com/">
 
-<!-- Open Graph — controls how the site looks when shared on WhatsApp, Facebook, etc. -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Sultini Express — Food & Pharmacy Delivery, Sokoto & Kaduna">
 <meta property="og:description" content="Order food and pharmacy essentials for delivery across Sokoto and Kaduna. Local dishes, grills, drinks, desserts, and medicine — delivered or ready for pickup.">
@@ -18,9 +17,6 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 
-<!-- Structured data — tells Google specifically that this is a local delivery
-     business serving Sokoto and Kaduna, which is what helps it surface in
-     local search and Maps results alongside your Google Business Profile. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -45,478 +41,203 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --plum:#6B5058;
-    --plum-deep:#3E2E33;
-    --habanero:#C6577A;
-    --habanero-deep:#A8425F;
-    --lime:#E7D4CE;
-    --warm-white:#FBEEEC;
-    --charcoal:#2E2528;
-    --ink-soft:#8A7A7E;
-    --line:rgba(107,80,88,0.14);
-    --radius:18px;
+    --pink:#E91E63;
+    --pink-deep:#C2185B;
+    --pink-light:#FCE4EC;
+    --ink:#1A1A2E;
+    --ink-soft:#6B6B7B;
+    --line:#EFEFF3;
+    --white:#FFFFFF;
+    --stone:#F7F7FA;
   }
-  *{box-sizing:border-box; margin:0; padding:0;}
-  html{scroll-behavior:smooth;}
-  body{
-    font-family:'Inter',sans-serif;
-    background:var(--warm-white);
-    color:var(--charcoal);
-    -webkit-font-smoothing:antialiased;
-    overflow-x:hidden;
-  }
-  h1,h2,h3,.brand{font-family:'Fraunces',serif; font-optical-sizing:auto;}
-  .mono{font-family:'JetBrains Mono',monospace;}
-  a{color:inherit; text-decoration:none;}
-  img{display:block; max-width:100%;}
-  .wrap{max-width:1180px; margin:0 auto; padding:0 20px;}
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Inter',sans-serif; background:var(--white); color:var(--ink); -webkit-font-smoothing:antialiased; padding-bottom:70px;}
+  h1,h2,h3{font-family:'Fraunces',serif; margin:0;}
+  a{text-decoration:none; color:inherit;}
+  .wrap{max-width:1120px; margin:0 auto; padding:0 20px;}
+  img{max-width:100%; display:block;}
 
   /* ---------- Header ---------- */
-  header{
-    position:sticky; top:0; z-index:50;
-    background:rgba(251,238,236,0.92);
-    backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--line);
-  }
-  .nav-row{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:14px 20px;
-    max-width:1180px; margin:0 auto;
-  }
-
-  .location-search-bar{
-    max-width:1180px; margin:0 auto; padding:0 20px 10px;
-    display:flex; flex-direction:column; gap:6px;
-  }
-  .location-label{
-    display:flex; align-items:center; gap:4px;
-    font-size:12px; font-weight:700; color:var(--plum);
-    width:fit-content; cursor:pointer;
-  }
-  .location-label .location-pin{ font-size:12px; }
-  .location-label select{
-    border:none; background:transparent; font-weight:700; color:var(--plum);
-    font-size:12px; font-family:inherit; padding:2px 4px; cursor:pointer;
-    -webkit-appearance:none; appearance:none;
-  }
-  .header-search{
-    display:flex; align-items:center; gap:8px;
-    background:var(--stone); border-radius:12px; padding:9px 14px;
-  }
-  .header-search .search-ico{ font-size:14px; opacity:0.6; }
-  .header-search input{
-    border:none; background:transparent; width:100%; font-size:13.5px;
-    color:var(--charcoal); font-family:inherit;
-  }
-  .header-search input:focus{ outline:none; }
-  @media (min-width:760px){
-    .location-search-bar{ flex-direction:row; align-items:center; gap:20px; }
-    .header-search{ max-width:420px; }
-  }
-
-  .brand{
-    font-size:20px; font-weight:700; color:var(--plum);
-    display:flex; align-items:center; gap:8px;
-    letter-spacing:-0.02em;
-  }
-  .brand .dot{
-    width:9px; height:9px; border-radius:50%; background:var(--habanero);
-    display:inline-block;
-  }
-  .nav-actions{display:flex; align-items:center; gap:10px;}
-  .btn{
-    font-family:'Inter',sans-serif;
-    font-weight:600; font-size:14px;
-    padding:9px 16px; border-radius:100px;
-    border:none; cursor:pointer;
-    transition:transform .15s ease, box-shadow .15s ease;
-    white-space:nowrap;
-  }
-  .btn:active{transform:scale(0.96);}
-  .btn-ghost{background:transparent; color:var(--plum);}
-  .btn-line{background:transparent; color:var(--plum); border:1.5px solid var(--line);}
-  .btn-solid{background:var(--plum); color:var(--warm-white);}
-  .btn-solid:hover{background:var(--plum-deep);}
-  .btn-vendor{
-    background:var(--lime); color:var(--plum-deep);
-    box-shadow:0 2px 0 0 #D2B6AC;
-  }
-  .btn-hero{
-    background:var(--habanero); color:#fff;
-    font-size:16px; padding:15px 26px;
-    box-shadow:0 6px 0 0 var(--habanero-deep);
-  }
-  .btn-hero:active{box-shadow:0 2px 0 0 var(--habanero-deep); transform:translateY(4px);}
-
-  .menu-toggle{
-    display:flex; flex-direction:column; gap:4px;
-    background:none; border:none; cursor:pointer; padding:8px;
-  }
-  .menu-toggle span{width:20px; height:2px; background:var(--plum); border-radius:2px;}
+  header{position:sticky; top:0; z-index:70; background:var(--white); border-bottom:1px solid var(--line);}
+  .nav-row{display:flex; align-items:center; justify-content:space-between; padding:14px 20px;}
+  .brand{display:flex; align-items:center; gap:8px; font-family:'Fraunces',serif; font-weight:600; font-size:19px; color:var(--ink);}
+  .brand .dot{width:9px; height:9px; border-radius:50%; background:var(--pink);}
+  .nav-actions{display:none; align-items:center; gap:10px;}
   .desktop-only{display:none;}
-  .mobile-menu{
-    display:none;
-    flex-direction:column; gap:8px;
-    padding:0 20px 18px;
-  }
+  .btn{display:inline-flex; align-items:center; justify-content:center; padding:11px 20px; border-radius:100px; font-weight:600; font-size:13.5px; border:none; cursor:pointer; transition:transform .15s ease;}
+  .btn:active{transform:scale(0.97);}
+  .btn-pink{background:var(--pink); color:#fff;}
+  .btn-pink:hover{background:var(--pink-deep);}
+  .btn-line{background:none; border:1.5px solid var(--line); color:var(--ink);}
+  .btn-ghost{background:none; color:var(--ink-soft);}
+  .btn-vendor{background:var(--ink); color:#fff;}
+  .menu-toggle{display:flex; flex-direction:column; gap:4px; background:none; border:none; cursor:pointer; padding:6px;}
+  .menu-toggle span{width:20px; height:2px; background:var(--ink); border-radius:2px;}
+  .mobile-menu{display:none; flex-direction:column; gap:8px; padding:0 20px 16px;}
   .mobile-menu.open{display:flex;}
-  .mobile-menu .btn{width:100%; text-align:center;}
 
-  /* ---------- Hero ---------- */
-  .hero{
-    position:relative;
-    padding:20px 20px 26px;
-    background:
-      radial-gradient(120% 90% at 15% -10%, rgba(198,87,122,0.14), transparent 55%),
-      radial-gradient(100% 80% at 100% 0%, rgba(231,212,206,0.45), transparent 50%),
-      var(--warm-white);
-    overflow:hidden;
+  /* ---------- Hero headline ---------- */
+  .hero-top{ padding:32px 20px 20px; }
+  .hero-top-grid{ display:flex; flex-direction:column; text-align:center; }
+  .hero-top h1{ font-size:28px; font-weight:600; line-height:1.15; color:var(--ink); }
+  .hero-top h1 .accent{ color:var(--pink); }
+  .hero-sub{ font-size:14px; color:var(--ink-soft); margin-top:10px; max-width:420px; margin-left:auto; margin-right:auto; }
+  .hero-top-img{ border-radius:24px; overflow:hidden; box-shadow:0 24px 48px -24px rgba(0,0,0,0.35); }
+  .hero-top-img img{ width:100%; height:100%; object-fit:cover; aspect-ratio:4/3; }
+  .order-now-btn{
+    display:block; width:100%; max-width:1120px; margin:12px auto 0; padding:15px;
+    border-radius:16px; background:var(--pink); color:#fff; font-weight:700; font-size:14.5px;
+    border:none; cursor:pointer; box-shadow:0 14px 26px -12px rgba(233,30,99,0.55);
   }
-  .eyebrow{
-    display:inline-flex; align-items:center; gap:6px;
-    font-family:'JetBrains Mono',monospace;
-    font-size:12px; font-weight:600; letter-spacing:0.02em;
-    background:var(--plum); color:var(--lime);
-    padding:6px 12px; border-radius:100px;
-    margin-bottom:18px;
-  }
-  .hero h1{
-    font-size:38px; line-height:1.05; font-weight:700;
-    color:var(--plum); letter-spacing:-0.02em;
-    max-width:520px;
-  }
-  .hero h1 .accent{color:var(--habanero);}
-  .hero p{
-    margin-top:16px; font-size:16px; line-height:1.55;
-    color:var(--ink-soft); max-width:440px;
-  }
-  .hero-ctas{display:flex; gap:12px; margin-top:26px; flex-wrap:wrap;}
-
-  .hero-grid{display:block; position:relative; z-index:2;}
-  .hero-photo{
-    position:relative; padding:0; overflow:hidden;
-    border-radius:0 0 28px 28px;
-    min-height:480px;
-    display:flex; align-items:flex-end;
-  }
-  .hero-carousel{position:absolute; inset:0; z-index:0;}
-  .hero-bg-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1s ease;}
-  .hero-bg-img.active{opacity:1;}
-
-  /* Quiet, consistent scroll-reveal used throughout the page — the hero
-     carousel above is the one bold motion moment; everything else here
-     stays understated on purpose. */
-  .reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease;}
-  .reveal.in-view{opacity:1; transform:translateY(0);}
-  @media (prefers-reduced-motion: reduce){
-    .hero-bg-img{transition:none;}
-    .reveal{opacity:1; transform:none; transition:none;}
-  }
-  .hero-overlay{
-    position:absolute; inset:0; z-index:1;
-    background:linear-gradient(180deg, rgba(46,37,40,0.15) 0%, rgba(46,37,40,0.55) 55%, rgba(46,37,40,0.92) 100%);
-  }
-  .hero-photo .wrap{padding:0 20px 32px; width:100%;}
-  .hero-photo .eyebrow{background:rgba(251,238,236,0.16); color:var(--warm-white); backdrop-filter:blur(6px);}
-  h1.on-photo{color:#fff; max-width:480px;}
-  h1.on-photo .accent{color:#F3B9C7;}
-  p.on-photo{color:rgba(255,255,255,0.82); max-width:420px;}
-  .btn-line-photo{
-    background:rgba(255,255,255,0.1); color:#fff; border:1.5px solid rgba(255,255,255,0.5);
-    backdrop-filter:blur(6px); font-weight:600; font-size:14px; padding:15px 22px;
-    border-radius:100px;
+  .order-now-btn:active{ transform:scale(0.98); }
+  @media (min-width:760px){
+    .hero-top h1{ font-size:38px; }
+    .hero-top-grid{ flex-direction:row; align-items:center; gap:40px; text-align:left; max-width:1120px; margin:0 auto; }
+    .hero-top-grid > div:first-child{ flex:1; }
+    .hero-sub{ margin-left:0; }
+    .hero-top-img{ flex:1; display:block !important; }
   }
 
-  /* categories photo grid */
-  .cat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px;}
-  .cat-card{
-    display:flex; flex-direction:column; align-items:center; gap:8px;
-    text-align:center;
+  /* ---------- Location selector — FIRST, large and prominent ---------- */
+  .location-bar{background:#fff; padding:14px 20px; border-bottom:1px solid var(--line);}
+  .location-inner{max-width:1120px; margin:0 auto; display:flex; align-items:center; gap:10px;}
+  .location-pin{font-size:18px;}
+  .location-text{font-size:12px; color:var(--ink-soft); font-weight:600;}
+  #citySelect{
+    border:none; background:none; font-family:'Fraunces',serif; font-weight:600; font-size:17px;
+    color:var(--pink-deep); padding:0; margin-left:2px;
   }
-  .cat-card img{
-    width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:20px;
-    box-shadow:0 12px 24px -12px rgba(107,80,88,0.45);
-    transition:transform .18s ease;
-  }
-  .cat-card:active img{transform:scale(0.95);}
-  @media (hover:hover){ .cat-card:hover img{transform:translateY(-3px);} }
-  .cat-card-label{font-size:12.5px; font-weight:600; color:var(--plum);}
 
+  /* ---------- Large search bar ---------- */
+  .search-section{padding:22px 20px 6px;}
+  .search-bar-large{
+    max-width:1120px; margin:0 auto; display:flex; align-items:center; gap:12px;
+    background:var(--stone); border-radius:18px; padding:16px 20px; border:1.5px solid var(--line);
+  }
+  .search-bar-large input{
+    border:none; background:none; flex:1; font-size:15px; font-family:inherit; color:var(--ink); outline:none;
+  }
+  .search-bar-large .ico{font-size:18px; opacity:0.5;}
+
+  /* ---------- Food / Grocery / Pharmacy quick cards ---------- */
+  .quick-cards{ display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; padding:22px 20px 6px; max-width:1120px; margin:0 auto; }
+  .quick-card{
+    position:relative; border-radius:18px; overflow:hidden; aspect-ratio:1;
+    border:none; cursor:pointer; padding:0; display:block;
+    box-shadow:0 12px 24px -16px rgba(0,0,0,0.4);
+  }
+  .quick-card img{ width:100%; height:100%; object-fit:cover; }
+  .quick-card .qc-overlay{ position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0.05)); }
+  .quick-card .qc-label{ position:absolute; left:10px; bottom:10px; color:#fff; font-weight:700; font-size:13.5px; display:flex; align-items:center; gap:6px; }
+
+  /* ---------- Section heading ---------- */
+  .section-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
+  .section-head .kicker{font-size:11px; font-weight:700; color:var(--pink); text-transform:uppercase; letter-spacing:0.07em;}
+  .section-head h2{font-size:21px; font-weight:600; color:var(--ink); margin-top:2px;}
+
+  section{padding:30px 0 0;}
+
+  /* ---------- City cards ---------- */
   .city-cards-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   .city-card{
-    position:relative; border-radius:20px; overflow:hidden; height:130px;
-    cursor:pointer; border:none; padding:0; text-align:left; display:block;
-    box-shadow:0 12px 26px -16px rgba(107,80,88,0.45);
+    position:relative; border-radius:20px; overflow:hidden; height:120px;
+    cursor:pointer; border:none; padding:0; display:block; box-shadow:0 12px 26px -18px rgba(0,0,0,0.4);
   }
   .city-card img{ width:100%; height:100%; object-fit:cover; }
-  .city-card .overlay{
-    position:absolute; inset:0; background:linear-gradient(to top, rgba(58,42,46,0.75), rgba(58,42,46,0.05));
-  }
-  .city-card .label{ position:absolute; left:16px; bottom:12px; color:#fff; }
-  .city-card .label .cn{ font-family:'Fraunces', serif; font-size:19px; font-weight:600; }
-  .city-card .label .cs{ font-size:11.5px; opacity:0.85; margin-top:1px; }
-  .city-card.selected{ outline:3px solid var(--rose-deep); outline-offset:2px; }
-  .howit-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  .howit-card{
-    background:#fff; border-radius:20px; padding:20px 16px;
-    box-shadow:0 10px 24px -16px rgba(107,80,88,0.35); text-align:center;
-  }
-  .howit-ico{ font-size:28px; margin-bottom:10px; }
-  .howit-title{ font-family:'Fraunces', serif; font-size:15px; font-weight:600; color:var(--charcoal); margin-bottom:4px; }
-  .howit-sub{ font-size:12px; color:var(--ink-soft); line-height:1.5; }
-  @media (min-width:640px){ .howit-grid{grid-template-columns:repeat(4, 1fr);} }
-  .trust-grid{
-    display:grid; grid-template-columns:repeat(2, 1fr); gap:14px;
-  }
-  .trust-card{
-    background:#fff; border-radius:20px; padding:22px 18px;
-    box-shadow:0 10px 24px -16px rgba(107,80,88,0.35);
-  }
-  .trust-ico{
-    width:44px; height:44px; border-radius:12px; background:var(--stone);
-    display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:12px;
-  }
-  .trust-title{font-family:'Fraunces', serif; font-size:16px; font-weight:600; color:var(--charcoal); margin-bottom:4px;}
-  .trust-sub{font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
-  @media (min-width:640px){ .trust-grid{grid-template-columns:repeat(4, 1fr);} }
-  .collage-tall{grid-row:span 2; border-radius:var(--radius); overflow:hidden; aspect-ratio:1/1.25; box-shadow:0 18px 40px -14px rgba(107,80,88,0.35);}
-  .collage-small{border-radius:var(--radius); overflow:hidden; aspect-ratio:1/0.85; box-shadow:0 14px 30px -12px rgba(107,80,88,0.3);}
-  .hero-collage img{width:100%; height:100%; object-fit:cover;}
+  .city-card .overlay{ position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0.05)); }
+  .city-card .label{ position:absolute; left:14px; bottom:12px; color:#fff; }
+  .city-card .label .cn{ font-family:'Fraunces',serif; font-size:17px; font-weight:600; }
+  .city-card .label .cs{ font-size:11px; opacity:0.85; }
+  .city-card.selected{ outline:3px solid var(--pink); outline-offset:2px; }
 
-  .dish-scroll{
-    display:flex; gap:14px; overflow-x:auto; padding:6px 20px 10px; margin:0 -20px;
-    -ms-overflow-style:none; scrollbar-width:none;
-  }
-  .dish-scroll::-webkit-scrollbar{display:none;}
-  .dish-card{
-    flex:0 0 auto; width:168px; text-decoration:none; display:block;
-  }
-  .dish-card img{
-    width:168px; height:168px; object-fit:cover; border-radius:18px;
-    box-shadow:0 14px 26px -14px rgba(107,80,88,0.5);
-  }
-  .dish-card .dn{ font-size:13.5px; font-weight:700; color:var(--charcoal); margin-top:8px; line-height:1.25; }
-  .dish-card .dp{ font-size:12.5px; color:var(--plum); font-weight:700; margin-top:2px; }
-  .dish-card .dv{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
-
-  /* category pills */
-  .cat-scroll{
-    display:flex; gap:10px; overflow-x:auto;
-    padding:22px 20px 6px; margin:0 -20px;
-    -ms-overflow-style:none; scrollbar-width:none;
-  }
+  /* ---------- Category cards ---------- */
+  .cat-scroll{ display:flex; gap:10px; overflow-x:auto; padding:2px 20px 6px; margin:0 -20px; -ms-overflow-style:none; scrollbar-width:none; }
   .cat-scroll::-webkit-scrollbar{display:none;}
   .cat-pill{
-    flex:0 0 auto;
-    display:flex; align-items:center; gap:8px;
-    padding:10px 16px; border-radius:100px;
-    background:#fff; border:1.5px solid var(--line);
-    font-size:14px; font-weight:600; color:var(--plum);
-    white-space:nowrap;
+    flex:0 0 auto; padding:9px 16px; border-radius:100px; background:var(--stone); border:1.5px solid var(--line);
+    font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; white-space:nowrap;
   }
-  .cat-pill.active{background:var(--plum); color:var(--warm-white); border-color:var(--plum);}
+  .cat-pill.active{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .cat-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+  .cat-card{ text-decoration:none; display:block; }
+  .cat-card img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:16px; }
+  .cat-card-label{ font-size:12px; font-weight:600; color:var(--ink); margin-top:8px; text-align:center; }
 
-  /* ---------- Section shell ---------- */
-  section{padding:48px 20px;}
-  .section-head{margin-bottom:22px;}
-  .section-head .kicker{
-    font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
-    color:var(--habanero); text-transform:uppercase; letter-spacing:0.06em;
-  }
-  .section-head h2{
-    font-size:26px; font-weight:700; color:var(--plum);
-    margin-top:6px; letter-spacing:-0.01em;
-  }
-
-  /* ---------- How it works / ticket stub signature ---------- */
-  .how{background:var(--plum); border-radius:24px; margin:0 20px; padding:36px 22px; color:var(--warm-white);}
-  .how .section-head h2{color:var(--warm-white);}
-  .how .section-head .kicker{color:var(--lime);}
-  .how-steps{display:flex; flex-direction:column; gap:14px; margin-top:10px;}
-  .how-step{
-    display:flex; gap:14px; align-items:flex-start;
-    background:rgba(251,238,236,0.06);
-    border:1px solid rgba(251,238,236,0.12);
-    border-radius:14px; padding:16px;
-  }
-  .how-step .num{
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px;
-    color:var(--plum-deep); background:var(--lime);
-    width:26px; height:26px; border-radius:8px;
-    display:flex; align-items:center; justify-content:center;
-    flex:0 0 auto;
-  }
-  .how-step h3{font-size:15px; font-weight:600; margin-bottom:4px;}
-  .how-step p{font-size:13.5px; color:rgba(251,238,236,0.72); line-height:1.5;}
-
-  /* the ticket stub — signature element */
-  .ticket{
-    margin-top:24px;
-    background:var(--warm-white);
-    border-radius:16px;
-    position:relative;
-    display:flex; align-items:stretch;
-    color:var(--charcoal);
-    overflow:hidden;
-  }
-  .ticket-main{padding:18px; flex:1;}
-  .ticket-main .label{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft); letter-spacing:0.05em; text-transform:uppercase;}
-  .ticket-main .code{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--plum); margin-top:4px; letter-spacing:0.04em;}
-  .ticket-main .sub{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
-  .ticket-stub{
-    width:76px; flex:0 0 auto;
-    background:var(--lime);
-    display:flex; align-items:center; justify-content:center;
-    position:relative;
-  }
-  .ticket-stub span{
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px;
-    color:var(--plum-deep); transform:rotate(90deg); white-space:nowrap;
-    letter-spacing:0.08em;
-  }
-  .ticket::before{
-    content:"";
-    position:absolute; left:calc(100% - 76px);
-    top:0; bottom:0; width:0;
-    border-left:2px dashed rgba(107,80,88,0.25);
-  }
-  .perf{
-    position:absolute; left:calc(100% - 76px); transform:translateX(-50%);
-    width:14px; height:14px; border-radius:50%; background:var(--warm-white);
-  }
-  .perf.top{top:-7px;} .perf.bot{bottom:-7px;}
-  .how > .perf{display:none;}
-
-  /* ---------- Stores grid ---------- */
-  .store-grid{
-    display:grid; grid-template-columns:1fr; gap:16px; margin-top:18px;
-  }
-  .store-card{
-    background:#fff; border-radius:var(--radius);
-    border:1px solid var(--line); overflow:hidden;
-    box-shadow:0 10px 26px -16px rgba(107,80,88,0.4);
-    transition:transform .18s ease, box-shadow .18s ease;
-  }
-  .store-card:active{transform:scale(0.98);}
-  @media (hover:hover){
-    .store-card:hover{transform:translateY(-3px); box-shadow:0 18px 34px -14px rgba(107,80,88,0.4);}
-  }
-  .store-img{aspect-ratio:16/9; position:relative; display:flex; align-items:center; justify-content:center;}
-  .store-img img{width:100%; height:100%; object-fit:cover;}
-  .store-photo-emoji{font-size:44px; filter:drop-shadow(0 4px 10px rgba(0,0,0,0.15)); animation:sizzle 3s ease-in-out infinite;}
-  @keyframes sizzle{0%,100%{transform:scale(1) rotate(0deg);} 50%{transform:scale(1.08) rotate(-4deg);}}
+  /* ---------- Store grid (Featured restaurants) ---------- */
+  #storeGrid{ display:grid; grid-template-columns:1fr; gap:16px; }
+  .store-card{ background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 24px -18px rgba(0,0,0,0.3); border:1px solid var(--line); text-decoration:none; }
+  .store-img{ aspect-ratio:16/9; position:relative; display:flex; align-items:center; justify-content:center; }
+  .store-img img{ width:100%; height:100%; object-fit:cover; }
   .store-badge{
     position:absolute; top:10px; left:10px;
-    background:rgba(26,21,32,0.75); color:#fff;
+    background:rgba(0,0,0,0.65); color:#fff;
     font-size:11px; font-weight:600; padding:5px 10px; border-radius:100px;
     backdrop-filter:blur(4px);
   }
-  .store-badge.rx{background:var(--plum);}
-  .store-body{padding:14px 16px 16px;}
-  .store-body h3{font-size:16px; font-weight:600; color:var(--charcoal);}
-  .store-meta{
-    display:flex; align-items:center; gap:10px; margin-top:6px;
-    font-size:12.5px; color:var(--ink-soft);
-  }
-  .store-meta .rating{color:var(--habanero-deep); font-weight:600;}
-  .store-tags{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
-  .tag{
-    font-size:11px; font-weight:600; color:var(--plum);
-    background:rgba(107,80,88,0.06); padding:4px 9px; border-radius:100px;
-  }
+  .store-badge.rx{ background:var(--pink-deep); }
+  .store-body{ padding:14px 16px 16px; }
+  .store-body h3{ font-size:15.5px; font-weight:600; color:var(--ink); }
+  .store-meta{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); margin-top:4px; }
+  .store-meta .rating{ color:var(--pink-deep); font-weight:700; }
+  @media (min-width:640px){ #storeGrid{ grid-template-columns:repeat(2, 1fr); } }
+  @media (min-width:960px){ #storeGrid{ grid-template-columns:repeat(3, 1fr); } }
 
-  /* ---------- Vendor CTA banner ---------- */
-  .vendor-banner{
-    background:linear-gradient(135deg, var(--habanero), var(--habanero-deep));
-    border-radius:24px; margin:0 20px; padding:32px 22px; color:#fff;
-    position:relative; overflow:hidden;
-  }
-  .vendor-banner h2{font-size:24px; font-weight:700; max-width:340px; letter-spacing:-0.01em;}
-  .vendor-banner p{font-size:14.5px; margin-top:10px; max-width:380px; color:rgba(255,255,255,0.9); line-height:1.55;}
-  .split-row{display:flex; gap:10px; margin-top:20px;}
-  .split-chip{
-    background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.28);
-    border-radius:12px; padding:10px 14px; flex:1;
-  }
-  .split-chip .pct{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;}
-  .split-chip .who{font-size:11.5px; color:rgba(255,255,255,0.85); margin-top:2px;}
-  .vendor-banner .btn-hero{margin-top:22px; background:#fff; color:var(--habanero-deep); box-shadow:0 6px 0 0 rgba(0,0,0,0.15);}
+  /* ---------- Popular dishes (dish-scroll) ---------- */
+  .dish-scroll{ display:flex; gap:14px; overflow-x:auto; padding:2px 20px 10px; margin:0 -20px; -ms-overflow-style:none; scrollbar-width:none; }
+  .dish-scroll::-webkit-scrollbar{display:none;}
+  .dish-card{ flex:0 0 auto; width:160px; text-decoration:none; display:block; }
+  .dish-card img{ width:160px; height:160px; object-fit:cover; border-radius:18px; box-shadow:0 14px 26px -16px rgba(0,0,0,0.3); }
+  .dish-card .dn{ font-size:13px; font-weight:700; color:var(--ink); margin-top:8px; line-height:1.25; }
+  .dish-card .dp{ font-size:12.5px; color:var(--pink-deep); font-weight:700; margin-top:2px; }
+  .dish-card .dv{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
+
+  /* ---------- Trust section ---------- */
+  .trust-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
+  .trust-card{ background:var(--stone); border-radius:18px; padding:20px 16px; }
+  .trust-ico{ width:42px; height:42px; border-radius:12px; background:var(--pink-light); display:flex; align-items:center; justify-content:center; font-size:19px; margin-bottom:10px; }
+  .trust-title{ font-family:'Fraunces',serif; font-size:15px; font-weight:600; color:var(--ink); }
+  .trust-sub{ font-size:12px; color:var(--ink-soft); margin-top:4px; line-height:1.5; }
+  @media (min-width:640px){ .trust-grid{ grid-template-columns:repeat(4, 1fr); } }
+
+  /* ---------- Vendor CTA ---------- */
+  .vendor-cta{ background:var(--ink); border-radius:24px; padding:34px 24px; color:#fff; text-align:center; }
+  .vendor-cta h2{ font-size:23px; font-weight:600; max-width:340px; margin:0 auto; }
+  .vendor-cta p{ font-size:13.5px; color:rgba(255,255,255,0.7); margin-top:10px; max-width:360px; margin-left:auto; margin-right:auto; line-height:1.55; }
+  .vendor-cta .btn-pink{ margin-top:20px; }
+  .vendor-cta .sublink{ display:block; margin-top:12px; font-size:12.5px; color:rgba(255,255,255,0.6); text-decoration:underline; }
 
   /* ---------- Footer ---------- */
-  .site-footer{padding:48px 0 90px; background:var(--plum); color:rgba(255,255,255,0.9);}
-  .footer-grid{
-    display:grid; grid-template-columns:1fr; gap:32px; padding:0 20px;
-  }
-  .footer-brand .brand{color:#fff;}
-  .footer-brand p{font-size:12.5px; color:rgba(255,255,255,0.65); margin-top:8px; max-width:280px;}
-  .footer-heading{font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:10px;}
-  .footer-col{display:flex; flex-direction:column; gap:8px;}
-  .footer-col a{color:rgba(255,255,255,0.85); font-size:13.5px; text-decoration:none;}
-  .footer-col a:hover{color:#fff; text-decoration:underline;}
-  .footer-bottom{margin-top:36px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.15); font-size:11.5px; color:rgba(255,255,255,0.5);}
-  @media (min-width:640px){
-    .footer-grid{grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;}
-  }
-  footer .brand{justify-content:center; margin-bottom:10px;}
-  footer p{font-size:13px; color:var(--ink-soft);}
+  .site-footer{ padding:44px 0 90px; background:var(--ink); color:rgba(255,255,255,0.85); margin-top:40px; }
+  .footer-grid{ display:grid; grid-template-columns:1fr; gap:28px; padding:0 20px; }
+  .footer-brand .brand{ color:#fff; }
+  .footer-brand p{ font-size:12.5px; color:rgba(255,255,255,0.55); margin-top:8px; max-width:280px; }
+  .footer-heading{ font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-bottom:10px; }
+  .footer-col{ display:flex; flex-direction:column; gap:8px; }
+  .footer-col a{ color:rgba(255,255,255,0.8); font-size:13.5px; }
+  .footer-col a:hover{ color:var(--pink); }
+  .footer-bottom{ margin-top:32px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.12); font-size:11.5px; color:rgba(255,255,255,0.4); padding-left:20px; }
+  @media (min-width:640px){ .footer-grid{ grid-template-columns:1.4fr 1fr 1fr 1fr 1fr; } }
 
-  /* ---------- Mobile bottom nav (thumb-friendly) ---------- */
-  .bottom-nav{
-    position:fixed; bottom:0; left:0; right:0; z-index:60;
-    background:#fff; border-top:1px solid var(--line);
-    display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
-    box-shadow:0 -4px 16px rgba(107,80,88,0.06);
-  }
-  .bottom-nav a{
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
-    font-size:10.5px; font-weight:600; color:var(--ink-soft); padding:4px 0;
-  }
-  .bottom-nav a.active{color:var(--habanero-deep);}
-  .bottom-nav .ico{width:20px; height:20px; border-radius:6px; background:currentColor; opacity:0.15;}
-  .bottom-nav a.active .ico{opacity:1; background:var(--habanero);}
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav{ position:fixed; bottom:0; left:0; right:0; z-index:60; background:#fff; border-top:1px solid var(--line); display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); }
+  .bottom-nav a{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; font-weight:600; color:var(--ink-soft); padding:4px 0; }
+  .bottom-nav a.active{ color:var(--pink); }
+  .bottom-nav .ico{ width:20px; height:20px; border-radius:6px; background:currentColor; opacity:0.15; }
+  .bottom-nav a.active .ico{ opacity:1; background:var(--pink); }
 
-  /* ---------- Desktop / tablet up ---------- */
+  /* ---------- Reveal animation ---------- */
+  .reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in-view{opacity:1; transform:translateY(0);}
+  @media (prefers-reduced-motion: reduce){ .reveal{opacity:1; transform:none; transition:none;} }
+
   @media (min-width:760px){
     .desktop-only{display:flex;}
     .menu-toggle{display:none;}
     .mobile-menu{display:none !important;}
     .bottom-nav{display:none;}
-    .hero{padding:64px 20px 60px;}
-    .hero-photo{padding:0; min-height:560px;}
-    .hero-photo .wrap{padding:0 40px 48px;}
-    .hero .wrap{display:block;}
-    .hero h1{font-size:52px; max-width:none;}
-    h1.on-photo{max-width:640px;}
-    .hero p{font-size:17px; max-width:460px;}
-    .cat-scroll{padding-left:0; padding-right:0; margin:22px 0 0;}
-    .cat-grid{grid-template-columns:repeat(6,1fr);}
-    .store-grid{grid-template-columns:repeat(3,1fr);}
-    .how{padding:48px 40px;}
-    .how .wrap-inner{display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start;}
-    .vendor-banner{padding:44px 40px;}
-    .vendor-banner .wrap-inner{display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center;}
-    .vendor-banner .btn-hero{margin-top:0;}
-    section{padding:64px 20px;}
+    body{padding-bottom:0;}
+    .location-bar{display:none;} /* desktop uses the header dropdown pattern below instead if needed */
   }
-  @media (min-width:1000px){
-    .hero h1{font-size:60px;}
-  }
-
-  @media (prefers-reduced-motion: reduce){
-    html{scroll-behavior:auto;}
-    *{transition:none !important; animation:none !important;}
-  }
-
-  @keyframes floatIn{
-    from{opacity:0; transform:translateY(14px);}
-    to{opacity:1; transform:translateY(0);}
-  }
-  .hero .eyebrow, .hero h1, .hero p, .hero-ctas{
-    animation:floatIn .6s ease both;
-  }
-  .hero h1{animation-delay:.05s;}
-  .hero p{animation-delay:.12s;}
-  .hero-ctas{animation-delay:.18s;}
 </style>
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
@@ -534,12 +255,12 @@
     <div class="desktop-only nav-actions" id="navActionsLoggedOut">
       <a href="order.html" class="btn btn-ghost">Continue as guest</a>
       <a href="order.html?screen=account" class="btn btn-line">Log in</a>
-      <a href="order.html?screen=account" class="btn btn-solid">Sign up</a>
+      <a href="order.html?screen=account" class="btn btn-pink">Sign up</a>
       <a href="vendor.html" class="btn btn-vendor">Vendor</a>
     </div>
     <div class="desktop-only nav-actions" id="navActionsLoggedIn" style="display:none;">
       <a href="order.html" class="btn btn-ghost">Browse stores</a>
-      <a href="order.html?screen=account" class="btn btn-solid">My Account</a>
+      <a href="order.html?screen=account" class="btn btn-pink">My Account</a>
       <a href="vendor.html" class="btn btn-vendor">Vendor</a>
     </div>
     <button class="menu-toggle" onclick="document.getElementById('mmenu').classList.toggle('open')" aria-label="Menu">
@@ -547,66 +268,72 @@
     </button>
   </div>
 
-  <div class="location-search-bar">
-    <label for="citySelect" class="location-label">
-      <span class="location-pin">📍</span>
-      <span>Delivering to</span>
-      <select id="citySelect" onchange="changeCity(this.value)"></select>
-    </label>
-    <div class="header-search">
-      <span class="search-ico">🔍</span>
-      <input type="text" id="headerSearchInput" placeholder="Search dishes, stores, medicine…" onkeydown="if(event.key==='Enter') submitHeaderSearch();">
-    </div>
-  </div>
-
   <div class="mobile-menu" id="mmenu">
     <a href="vendor.html" class="btn btn-line">Vendor login</a>
     <a href="vendor.html" class="btn btn-vendor">Become a vendor</a>
     <div id="mmenuLoggedOut">
-      <a href="order.html?screen=account" class="btn btn-solid">Sign up</a>
+      <a href="order.html?screen=account" class="btn btn-pink">Sign up</a>
       <a href="order.html?screen=account" class="btn btn-line">Log in</a>
     </div>
     <div id="mmenuLoggedIn" style="display:none;">
-      <a href="order.html?screen=account" class="btn btn-solid">My Account</a>
+      <a href="order.html?screen=account" class="btn btn-pink">My Account</a>
     </div>
     <a href="order.html" class="btn btn-ghost">Continue as guest</a>
   </div>
 </header>
 
-<div class="hero hero-photo">
-  <div class="hero-carousel">
-    <img class="hero-bg-img active" src="https://images.unsplash.com/photo-1767974968707-db3d448d4ef3?auto=format&fit=crop&w=1400&q=75" alt="">
-    <img class="hero-bg-img" src="https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=1400&q=75" alt="">
-    <img class="hero-bg-img" src="https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=1400&q=75" alt="">
-    <img class="hero-bg-img" src="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1400&q=75" alt="">
-  </div>
-  <div class="hero-overlay"></div>
-  <div class="wrap hero-grid">
+<!-- Hero: headline first, per spec -->
+<div class="hero-top wrap">
+  <div class="hero-top-grid">
     <div>
-      <h1 class="on-photo">Everything you crave, at your <span class="accent">door</span>.</h1>
-      <p class="on-photo" id="heroSubtext">Local dishes, drinks & pharmacy essentials — tracked live or ready for pickup.</p>
-      <div class="hero-ctas">
-        <a href="order.html" class="btn btn-hero">Order now</a>
-        <a href="#how" class="btn btn-line-photo">How pickup works</a>
-      </div>
+      <h1>Everything you love, delivered in <span class="accent">minutes</span>.</h1>
+      <p class="hero-sub">Order food, groceries and pharmacy essentials across Sokoto and Kaduna.</p>
+    </div>
+    <div class="hero-top-img desktop-only" style="display:none;">
+      <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=75" alt="Fresh local dishes ready for delivery">
     </div>
   </div>
 </div>
 
-<div class="wrap" style="margin-top:18px;">
-  <div class="cat-scroll">
-    <div class="cat-pill active" data-cat="">🍢 All</div>
-    <div class="cat-pill" data-cat="Local dishes">🍲 Local dishes</div>
-    <div class="cat-pill" data-cat="Grills & Suya">🍗 Grills & Suya</div>
-    <div class="cat-pill" data-cat="Chicken">🍗 Chicken</div>
-    <div class="cat-pill" data-cat="Drinks & Fura">🧉 Drinks & Fura</div>
-    <div class="cat-pill" data-cat="Desserts">🍰 Desserts</div>
-  <div class="cat-pill" data-cat="Grocery">🛒 Grocery</div>
-  <div class="cat-pill" data-cat="Pharmacy">💊 Pharmacy</div>
+<!-- Location selector — first, large and prominent, per spec -->
+<div class="location-bar">
+  <div class="location-inner">
+    <span class="location-pin">📍</span>
+    <span class="location-text">Delivering to</span>
+    <select id="citySelect" onchange="changeCity(this.value)"></select>
   </div>
 </div>
 
-<section id="city-cards" class="wrap" style="margin-top:20px;">
+<!-- Large search bar -->
+<div class="search-section">
+  <div class="search-bar-large">
+    <span class="ico">🔍</span>
+    <input type="text" id="headerSearchInput" placeholder="Search dishes, stores, medicine…" onkeydown="if(event.key==='Enter') submitHeaderSearch();">
+  </div>
+  <button class="order-now-btn" onclick="submitHeaderSearch()">Order Now</button>
+</div>
+
+<!-- Food / Grocery / Pharmacy quick cards -->
+<div class="quick-cards">
+  <button class="quick-card" onclick="filterByCategory('')">
+    <img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=400&q=75" alt="Food">
+    <div class="qc-overlay"></div>
+    <div class="qc-label">🍔 Food</div>
+  </button>
+  <button class="quick-card" onclick="filterByCategory('Grocery')">
+    <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=75" alt="Grocery">
+    <div class="qc-overlay"></div>
+    <div class="qc-label">🛒 Grocery</div>
+  </button>
+  <button class="quick-card" onclick="filterByCategory('Pharmacy')">
+    <img src="https://images.unsplash.com/photo-1696861286643-341a8d7a79e9?auto=format&fit=crop&w=400&q=75" alt="Pharmacy">
+    <div class="qc-overlay"></div>
+    <div class="qc-label">💊 Pharmacy</div>
+  </button>
+</div>
+
+<!-- City cards -->
+<section id="city-cards" class="wrap">
   <div class="section-head">
     <span class="kicker">Choose your city</span>
     <h2>Where are you ordering?</h2>
@@ -614,7 +341,8 @@
   <div id="cityCardsGrid" class="city-cards-grid"></div>
 </section>
 
-<section id="popular-dishes" style="margin-top:8px;">
+<!-- Popular dishes -->
+<section id="popular-dishes" class="wrap">
   <div class="section-head">
     <span class="kicker">Fresh today</span>
     <h2>Popular right now</h2>
@@ -622,157 +350,58 @@
   <div id="popularDishesScroll" class="dish-scroll"></div>
 </section>
 
-<section id="categories">
+<!-- Categories -->
+<section id="categories" class="wrap">
   <div class="section-head">
-    <span class="kicker">Top picks</span>
-    <h2>Our categories</h2>
+    <span class="kicker">Browse</span>
+    <h2>Categories</h2>
   </div>
-  <div class="cat-grid">
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Local dishes');return false;">
-      <img src="https://images.unsplash.com/photo-1757715376249-b2a3e943cdf5?auto=format&fit=crop&w=500&q=70" alt="Local dishes and rice plate">
-      <span class="cat-card-label">Local dishes</span>
-    </a>
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Grills & Suya');return false;">
-      <img src="https://images.unsplash.com/photo-1767974968707-db3d448d4ef3?auto=format&fit=crop&w=500&q=70" alt="Grilled suya skewers">
-      <span class="cat-card-label">Grills & Suya</span>
-    </a>
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Chicken');return false;">
-      <img src="https://images.unsplash.com/photo-1616401616927-3c81de22dfa8?auto=format&fit=crop&w=500&q=70" alt="Roast chicken">
-      <span class="cat-card-label">Chicken</span>
-    </a>
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Drinks & Fura');return false;">
-      <img src="https://images.unsplash.com/photo-1552286970-62449522d6f3?auto=format&fit=crop&w=500&q=70" alt="Smoothie drink">
-      <span class="cat-card-label">Drinks & Fura</span>
-    </a>
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Desserts');return false;">
-      <img src="https://images.unsplash.com/photo-1555526148-5cd740b44241?auto=format&fit=crop&w=500&q=70" alt="Desserts plate">
-      <span class="cat-card-label">Desserts</span>
-    </a>
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Grocery');return false;">
-      <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=70" alt="Grocery shelf">
-      <span class="cat-card-label">Grocery</span>
-    </a>
-    <a href="#stores" class="cat-card" onclick="filterByCategory('Pharmacy');return false;">
-      <img src="https://images.unsplash.com/photo-1696861286643-341a8d7a79e9?auto=format&fit=crop&w=500&q=70" alt="Pharmacy shelf">
-      <span class="cat-card-label">Pharmacy</span>
-    </a>
+  <div class="cat-scroll">
+    <div class="cat-pill active" data-cat="">🍢 All</div>
+    <div class="cat-pill" data-cat="Local dishes">🍲 Local dishes</div>
+    <div class="cat-pill" data-cat="Grills & Suya">🍗 Grills & Suya</div>
+    <div class="cat-pill" data-cat="Chicken">🍗 Chicken</div>
+    <div class="cat-pill" data-cat="Drinks & Fura">🧉 Drinks & Fura</div>
+    <div class="cat-pill" data-cat="Desserts">🍰 Desserts</div>
+    <div class="cat-pill" data-cat="Grocery">🛒 Grocery</div>
+    <div class="cat-pill" data-cat="Pharmacy">💊 Pharmacy</div>
   </div>
 </section>
 
-<section id="how-it-works-cards" class="wrap" style="margin-top:44px;">
-  <div class="section-head">
-    <span class="kicker">Simple</span>
-    <h2>How it works</h2>
-  </div>
-  <div class="howit-grid">
-    <div class="howit-card">
-      <div class="howit-ico">🔍</div>
-      <div class="howit-title">Browse & Order</div>
-      <div class="howit-sub">Pick from local restaurants, pharmacies, and stores near you.</div>
-    </div>
-    <div class="howit-card">
-      <div class="howit-ico">💳</div>
-      <div class="howit-title">Pay Securely</div>
-      <div class="howit-sub">Card, transfer, or USSD — or pay on delivery once unlocked.</div>
-    </div>
-    <div class="howit-card">
-      <div class="howit-ico">📍</div>
-      <div class="howit-title">Track Live</div>
-      <div class="howit-sub">Watch your order move from placed to on-the-way, in real time.</div>
-    </div>
-    <div class="howit-card">
-      <div class="howit-ico">🎉</div>
-      <div class="howit-title">Get It Delivered</div>
-      <div class="howit-sub">Right to your door — or pick up with your own one-time code.</div>
-    </div>
-  </div>
-</section>
-
-<section id="why-sultini" class="wrap" style="margin-top:44px;">
-  <div class="trust-grid">
-    <div class="trust-card">
-      <div class="trust-ico">⚡</div>
-      <div class="trust-title">Fast Delivery</div>
-      <div class="trust-sub">Real distance-based pricing, live tracking from order to doorstep.</div>
-    </div>
-    <div class="trust-card">
-      <div class="trust-ico">✓</div>
-      <div class="trust-title">Verified Vendors</div>
-      <div class="trust-sub">Every store on Sultini is checked and approved before going live.</div>
-    </div>
-    <div class="trust-card">
-      <div class="trust-ico">🔒</div>
-      <div class="trust-title">Secure Payments</div>
-      <div class="trust-sub">Card, bank transfer, or USSD — handled safely through Paystack.</div>
-    </div>
-    <div class="trust-card">
-      <div class="trust-ico">📍</div>
-      <div class="trust-title">Real-Time Tracking</div>
-      <div class="trust-sub">Know exactly where your order is, the moment it changes.</div>
-    </div>
-  </div>
-</section>
-
-<section id="stores">
+<!-- Featured restaurants (store grid) -->
+<section id="stores" class="wrap">
   <div class="section-head">
     <span class="kicker">Open now near you</span>
     <h2 id="categoriesHeading">Local favourite kitchens</h2>
   </div>
-  <div class="store-grid" id="storeGrid">
-    <div style="grid-column:1/-1; text-align:center; color:var(--ink-soft); padding:20px;">Loading stores…</div>
+  <div id="storeGrid"></div>
+  <div id="vendors"></div>
+</section>
+
+<!-- Trust section -->
+<section id="why-sultini" class="wrap">
+  <div class="section-head">
+    <span class="kicker">Why Sultini</span>
+    <h2>Built for real delivery</h2>
+  </div>
+  <div class="trust-grid">
+    <div class="trust-card"><div class="trust-ico">⚡</div><div class="trust-title">Fast Delivery</div><div class="trust-sub">Real distance-based pricing, live tracking from order to doorstep.</div></div>
+    <div class="trust-card"><div class="trust-ico">✓</div><div class="trust-title">Verified Vendors</div><div class="trust-sub">Every store on Sultini is checked and approved before going live.</div></div>
+    <div class="trust-card"><div class="trust-ico">🔒</div><div class="trust-title">Secure Payments</div><div class="trust-sub">Card, bank transfer, or USSD — handled safely through Paystack.</div></div>
+    <div class="trust-card"><div class="trust-ico">📍</div><div class="trust-title">Real-Time Tracking</div><div class="trust-sub">Know exactly where your order is, the moment it changes.</div></div>
   </div>
 </section>
 
-<section id="how" class="how">
-  <div class="wrap-inner wrap">
-    <div>
-      <div class="section-head">
-        <span class="kicker">Pickup or delivery</span>
-        <h2>Your order, your code.</h2>
-      </div>
-      <div class="how-steps">
-        <div class="how-step">
-          <span class="num">1</span>
-          <div><h3>Order from a store near you</h3><p>Food or pharmacy — pay online, or pay on delivery once you've unlocked it.</p></div>
-        </div>
-        <div class="how-step">
-          <span class="num">2</span>
-          <div><h3>Choose delivery or pickup</h3><p>Pick a Sultini rider to bring it, or set a pickup time — now, in an hour, or whenever suits you.</p></div>
-        </div>
-        <div class="how-step">
-          <span class="num">3</span>
-          <div><h3>Show your code, collect your order</h3><p>Every order gets a one-time pickup code. No code, no mix-ups.</p></div>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="ticket">
-        <div class="ticket-main">
-          <div class="label">Pickup code</div>
-          <div class="code">SK · 7429</div>
-          <div class="sub">Ready in 12 min · Musa's Kitchen, Runjin Sambo</div>
-        </div>
-        <span class="perf top"></span>
-        <div class="ticket-stub"><span>SULTINI</span></div>
-        <span class="perf bot"></span>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- How it works anchor target (kept for existing #how links) -->
+<div id="how"></div>
 
-<section id="vendors">
-  <div class="vendor-banner">
-    <div class="wrap-inner">
-      <div>
-        <h2>Own a restaurant or pharmacy? Get listed.</h2>
-        <p>Upload your menu, set what's in stock, and start taking orders. You keep the majority of every sale — we handle payments, delivery, and customers.</p>
-        <a href="vendor.html" class="btn btn-hero">Register your store</a>
-        <a href="vendor.html" style="display:block; margin-top:10px; font-size:13px; text-decoration:underline;">Already a vendor? Log in</a>
-      </div>
-      <div class="split-row">
-        <div class="split-chip" style="flex:1;"><div class="who" style="font-size:13px; line-height:1.5;">Full payout details and terms are shared privately when you register.</div></div>
-      </div>
-    </div>
+<!-- Vendor CTA -->
+<section class="wrap" style="margin-top:30px;">
+  <div class="vendor-cta">
+    <h2>Own a restaurant or pharmacy? Get listed.</h2>
+    <p>Upload your menu, set what's in stock, and start taking orders. You keep the majority of every sale — we handle payments, delivery, and customers.</p>
+    <a href="vendor.html" class="btn btn-pink">Register your store</a>
+    <a href="vendor.html" class="sublink">Already a vendor? Log in</a>
   </div>
 </section>
 
@@ -804,15 +433,13 @@
       <a href="legal.html#refunds">Refunds</a>
     </div>
   </div>
-  <div class="footer-bottom wrap">
-    <span>© 2026 Sultini Express</span>
-  </div>
+  <div class="footer-bottom">© 2026 Sultini Express</div>
 </footer>
 
 <a href="https://wa.me/2347033580395?text=Hi%20Sultini%20Express%2C%20I%20have%20a%20question" target="_blank" rel="noopener"
-   style="position:fixed; bottom:20px; right:20px; z-index:999; width:56px; height:56px; border-radius:50%; background:#25D366; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,0.25); text-decoration:none;"
+   style="position:fixed; bottom:80px; right:20px; z-index:999; width:52px; height:52px; border-radius:50%; background:#25D366; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,0.25); text-decoration:none;"
    aria-label="Message us on WhatsApp">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.005c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.88 9.88 0 0012.04 2zm5.8 14.09c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.81-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.35-.14-.19-1.17-1.55-1.17-2.96 0-1.4.74-2.09 1-2.38.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.12.07.15.12.32.02.51-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.18 1.53 1.91 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.28.36-.23.6-.14.24.09 1.55.73 1.81.86.27.14.45.2.51.32.07.12.07.68-.17 1.36z"/></svg>
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.005c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.88 9.88 0 0012.04 2zm5.8 14.09c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.81-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.35-.14-.19-1.17-1.55-1.17-2.96 0-1.4.74-2.09 1-2.38.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.12.07.15.12.32.02.51-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.18 1.53 1.91 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.28.36-.23.6-.14.24.09 1.55.73 1.81.86.27.14.45.2.51.32.07.12.07.68-.17 1.36z"/></svg>
 </a>
 
 <nav class="bottom-nav">
@@ -821,6 +448,7 @@
   <a href="order.html?screen=account"><span class="ico"></span>Orders</a>
   <a href="order.html?screen=account"><span class="ico"></span>Account</a>
 </nav>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
@@ -1089,6 +717,5 @@ loadActiveCitiesIntoCopy();
   setTimeout(applyReveal, 2000);
 })();
 </script>
-
 </body>
 </html>
