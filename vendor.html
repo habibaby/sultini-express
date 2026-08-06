@@ -203,6 +203,10 @@
     </label>
   </div>
   <div class="field">
+    <label>City</label>
+    <select id="signupCity" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:14px;"></select>
+  </div>
+  <div class="field">
     <label>Store category</label>
     <div class="cat-select-grid" style="grid-template-columns:1fr 1fr 1fr;">
       <button class="cat-select" data-cat="Local dishes">🍲 Local dishes</button>
@@ -660,11 +664,13 @@ async function submitRegistration(){
   const bankName = document.getElementById('bankCode').selectedOptions[0]?.textContent || '';
 
   const category = document.querySelector('.cat-select.selected')?.dataset.cat || 'Local dishes';
+  const city = document.getElementById('signupCity')?.value || 'Sokoto';
   const { data: vendorRows, error: vErr } = await supabaseClient.from('vendors').insert([{
     owner_id: session.user.id,
     email: session.user.email,
     name: document.getElementById('bizName').value.trim(),
     category,
+    city,
     phone: document.getElementById('bizPhone').value.trim(),
     whatsapp: document.getElementById('bizWhatsapp').value.trim(),
     address: document.getElementById('bizAddress').value.trim(),
@@ -767,7 +773,7 @@ async function goDashboard(){
   document.getElementById('locationConfirmResult').innerHTML = (currentVendor.lat != null)
     ? '✅ Location already confirmed — drag the pin and save again if your store has moved.'
     : '⚠️ Not confirmed yet — delivery fees for your store are using the standard fallback until this is done.';
-  initMapPicker('vendor', 'vendorMapPicker', currentVendor.lat, currentVendor.lng);
+  initMapPicker('vendor', 'vendorMapPicker', currentVendor.lat, currentVendor.lng, currentVendor.city?.toLowerCase());
   renderManualOpenToggle();
   await loadOrders();
   await loadMenu();
@@ -797,19 +803,40 @@ async function toggleManualOpen(){
 
 // ---- Map picker: type an address to jump there, then drag the pin to
 // the exact spot. The FINAL PIN POSITION is what gets saved — typed
-// addresses alone aren't reliably precise in Sokoto, so this is the
-// actual source of truth, not just a starting point.
+// addresses alone aren't reliably precise, so this is the actual
+// source of truth, not just a starting point.
 const mapPickers = {};
-const SOKOTO_CENTER = { lat: 13.0059, lng: 5.2476 };
+let ACTIVE_CITIES = [];
+let CITY_CENTERS = {};
+
+async function loadActiveCities(){
+  const { data } = await supabaseClient.from('cities').select('*').eq('is_active', true).order('name');
+  ACTIVE_CITIES = data || [];
+  CITY_CENTERS = Object.fromEntries(ACTIVE_CITIES.map(c => [c.id, { lat: Number(c.center_lat), lng: Number(c.center_lng) }]));
+  const select = document.getElementById('signupCity');
+  if(select){
+    select.innerHTML = ACTIVE_CITIES.map(c => `<option value="${c.name}" data-id="${c.id}">${c.name}</option>`).join('');
+  }
+}
+loadActiveCities();
+
+function currentPickerCity(name){
+  if(name === 'vendor' && document.getElementById('signupCity')){
+    const select = document.getElementById('signupCity');
+    return select.selectedOptions[0]?.dataset.id || 'sokoto';
+  }
+  return currentVendor?.city?.toLowerCase() || 'sokoto';
+}
 
 function waitForGoogleMaps(cb){
   if(window.google && window.google.maps) cb();
   else setTimeout(() => waitForGoogleMaps(cb), 200);
 }
 
-function initMapPicker(name, containerId, initialLat, initialLng){
+function initMapPicker(name, containerId, initialLat, initialLng, cityId){
   waitForGoogleMaps(() => {
-    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : SOKOTO_CENTER;
+    const fallbackCenter = CITY_CENTERS[cityId] || CITY_CENTERS['sokoto'] || { lat: 13.0059, lng: 5.2476 };
+    const center = (initialLat != null && initialLng != null) ? {lat:Number(initialLat), lng:Number(initialLng)} : fallbackCenter;
     const map = new google.maps.Map(document.getElementById(containerId), {
       center, zoom: initialLat != null ? 16 : 13, streetViewControl:false, mapTypeControl:false, fullscreenControl:false
     });
@@ -824,7 +851,7 @@ async function jumpMapToAddress(name){
   try {
     const resp = await fetch('/api/geocode', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'geocode', address })
+      body: JSON.stringify({ action: 'geocode', address, city: currentPickerCity(name) })
     });
     const result = await resp.json();
     if(!resp.ok) return;
