@@ -262,10 +262,17 @@
     </div>
   </div>
   <div class="option-group">
+    <div class="option-label">Special instructions <span style="color:var(--ink-soft); font-weight:400;">(optional)</span></div>
+    <textarea id="specialInstructions" placeholder="e.g. No pepper, call before arriving, leave at gate…" rows="3" style="width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); font-size:14px; font-family:inherit; resize:vertical;"></textarea>
+  </div>
+  <div class="option-group">
     <div class="option-label">Order summary</div>
     <div id="summaryContainer"></div>
   </div>
   <button class="btn btn-primary" id="placeOrderBtn" style="margin-top:8px;">Place order</button>
+  <div style="text-align:center; font-size:11.5px; color:var(--ink-soft); margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px;">
+    🔒 Secure payment via Paystack — your card details are never stored by Sultini
+  </div>
 </section>
 
 <section class="screen" id="screen-confirm">
@@ -779,6 +786,12 @@ document.getElementById('signupBtn').addEventListener('click', async ()=>{
   if(error){ errEl.textContent = error.message; return; }
   errEl.style.color = 'var(--green)';
   errEl.textContent = 'Account created — check your email to confirm, then log in.';
+  try {
+    await fetch('/api/notify', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'welcome', email, name: fullName })
+    });
+  } catch(e){ console.error('Welcome email failed', e); }
 });
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
@@ -896,8 +909,16 @@ document.querySelectorAll('.cat-pill').forEach(pill => {
   });
 });
 
+// Fire-and-forget — never let analytics logging block or break the
+// actual user experience if it fails for any reason.
+function trackFunnelEvent(eventType, vendorId){
+  supabaseClient.from('funnel_events').insert([{ event_type: eventType, vendor_id: vendorId || null }])
+    .then(() => {}).catch(() => {});
+}
+
 function openStore(id){
   currentStore = STORES.find(s=>s.id===id);
+  trackFunnelEvent('store_viewed', id);
   document.getElementById('storeHeroImg').src = currentStore.img;
   document.getElementById('storeHeroName').textContent = currentStore.name;
   document.getElementById('storeHeroMeta').textContent = `★ ${currentStore.rating} · ${currentStore.time}`;
@@ -1072,6 +1093,7 @@ let selectedSavedCardId = null;
 
 document.getElementById('toCheckoutBtn').addEventListener('click', ()=>{
   if(Object.keys(cart).length===0) return;
+  trackFunnelEvent('checkout_started', currentStore?.id);
   updatePayOptions(); renderSummary(); renderSavedCardPayOptions();
   prefillCheckoutDetails();
   showScreen('screen-checkout', true);
@@ -1201,6 +1223,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
     deliveryAddress: fulfilment==='delivery' ? document.getElementById('deliveryAddressInput').value.trim() : null,
     deliveryLat: fulfilment==='delivery' ? REAL_DELIVERY_LAT : null,
     deliveryLng: fulfilment==='delivery' ? REAL_DELIVERY_LNG : null,
+    specialInstructions: document.getElementById('specialInstructions').value.trim() || null,
     guestName, guestPhone, guestEmail
   };
 
@@ -1307,14 +1330,16 @@ function trackOrderLive(orderId, fulfilment){
 }
 
 function showConfirmation(pickupCode, orderId){
+  trackFunnelEvent('order_completed', currentStore?.id);
   const storeNames = [...new Set(Object.values(cart).map(c=>c.store.name))].join(', ');
   document.getElementById('confirmCode').textContent = pickupCode;
   const timeLabel = fulfilment==='delivery' ? 'On the way once ready' : (pickupTime==='now'?'Ready shortly':(pickupTime==='1hr'?'Ready in about 1 hour':'Ready at your set time'));
   document.getElementById('confirmDetail').textContent = `${timeLabel} · ${storeNames}`;
-  document.getElementById('confirmSub').textContent = fulfilment==='delivery' ? "A rider will be assigned once your order is ready." : "Show this code at pickup — it's yours alone.";
+  document.getElementById('confirmSub').textContent = fulfilment==='delivery' ? "A rider will be assigned once your order is ready. Share this code with them when they arrive, to confirm it's really you." : "Show this code at pickup — it's yours alone.";
   renderStatusTimeline(document.getElementById('liveStatusTimeline'), 'new', fulfilment);
   if(orderId) trackOrderLive(orderId, fulfilment);
   cart = {}; fulfilment = null; pickupTime = null;
+  document.getElementById('specialInstructions').value = '';
   document.getElementById('optDelivery').classList.remove('selected');
   document.getElementById('optPickup').classList.remove('selected');
   document.getElementById('pickupTimeGroup').style.display='none';
