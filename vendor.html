@@ -343,6 +343,7 @@
       <input type="text" id="vendorAddressInput" placeholder="e.g. 12 Runjin Sambo Road, Sokoto" onkeydown="if(event.key==='Enter'){event.preventDefault(); jumpMapToAddress('vendor');}">
     </div>
     <button type="button" class="btn" style="margin-bottom:10px;" onclick="jumpMapToAddress('vendor')">Find on map</button>
+    <button type="button" class="btn" style="margin-bottom:10px;" onclick="useMyLocationVendor()">📍 Use my current location</button>
     <div id="vendorMapPicker" style="height:260px; border-radius:12px; background:#eee;"></div>
     <div class="note" style="margin:8px 0;">Drag the red pin if it's not quite right.</div>
     <button class="btn" onclick="confirmStoreLocation()">Save this location</button>
@@ -843,6 +844,25 @@ function initMapPicker(name, containerId, initialLat, initialLng, cityId){
     const marker = new google.maps.Marker({ position: center, map, draggable: true });
     mapPickers[name] = { map, marker };
   });
+}
+
+function useMyLocationVendor(){
+  if(!navigator.geolocation){ alert('Your browser doesn\'t support location — please use the map or type your address instead.'); return; }
+  if(!mapPickers['vendor']) return;
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+      mapPickers['vendor'].map.setCenter(pos);
+      mapPickers['vendor'].map.setZoom(16);
+      mapPickers['vendor'].marker.setPosition(pos);
+    },
+    (error) => {
+      alert(error.code === error.PERMISSION_DENIED
+        ? 'Location permission denied — you can still type your address or drag the pin manually.'
+        : 'Could not get your location — please use the map or type your address instead.');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
 }
 
 async function jumpMapToAddress(name){
