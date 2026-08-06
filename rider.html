@@ -127,6 +127,7 @@
   <div id="tab-deliveries">
     <div class="note">Ready to deliver? Claim an open delivery below — first come, first served.</div>
     <div class="section-label" style="font-size:12.5px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:14px 0 8px;">Available deliveries</div>
+    <button id="riderLocationBtn" class="btn" style="margin-bottom:10px;" onclick="useMyLocationRider()">📍 Use my location</button>
     <div id="availableDeliveryList"><div class="empty">Loading…</div></div>
 
     <div class="section-label" style="font-size:12.5px; font-weight:700; color:var(--plum); text-transform:uppercase; letter-spacing:0.03em; margin:22px 0 8px;">Your deliveries</div>
@@ -235,7 +236,7 @@ async function loadAvailableDeliveries(){
   const dedicatedVendorIds = (dedicatedRows || []).map(r => r.dedicated_vendor_id);
 
   const { data: rawOrders } = await supabaseClient
-    .from('orders').select('*, vendors(name, address)')
+    .from('orders').select('*, vendors(name, address, lat, lng)')
     .eq('status', 'ready').eq('fulfilment', 'delivery').is('rider_id', null)
     .order('created_at', {ascending:true}).limit(40);
 
@@ -249,15 +250,59 @@ async function loadAvailableDeliveries(){
 
   const el = document.getElementById('availableDeliveryList');
   if(!orders || orders.length === 0){ el.innerHTML = '<div class="empty">No deliveries available right now.</div>'; return; }
-  el.innerHTML = orders.map(o => `
+
+  // If the rider has shared their location, sort closest-first and show
+  // real distance on each card — otherwise just show them in order.
+  let sortedOrders = orders;
+  if(RIDER_LAT != null){
+    sortedOrders = [...orders].sort((a, b) => distanceKm(RIDER_LAT, RIDER_LNG, a.vendors?.lat, a.vendors?.lng) - distanceKm(RIDER_LAT, RIDER_LNG, b.vendors?.lat, b.vendors?.lng));
+  }
+
+  el.innerHTML = sortedOrders.map(o => {
+    const dist = RIDER_LAT != null ? distanceKm(RIDER_LAT, RIDER_LNG, o.vendors?.lat, o.vendors?.lng) : null;
+    return `
     <div class="order-card">
       <div class="top">
         <div><div class="oid">${o.pickup_code}</div><h4>${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</h4></div>
+        ${dist != null ? `<span class="status-pill" style="background:var(--stone);">${dist.toFixed(1)} km away</span>` : ''}
       </div>
       <div class="order-meta">Pickup from: ${o.vendors?.address || 'store'}<br>Drop-off: ${o.delivery_address || 'address on file'}${o.guest_name ? `<br>For: ${o.guest_name}` : ''}</div>
       <div class="order-actions"><button class="primary" onclick="claimDelivery('${o.id}')">Accept this delivery</button></div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+let RIDER_LAT = null, RIDER_LNG = null;
+
+function distanceKm(lat1, lng1, lat2, lng2){
+  if(lat1 == null || lng1 == null || lat2 == null || lng2 == null) return Infinity;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function useMyLocationRider(){
+  const btn = document.getElementById('riderLocationBtn');
+  if(!navigator.geolocation){ alert('Your device doesn\'t support location.'); return; }
+  if(btn) btn.textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      RIDER_LAT = position.coords.latitude;
+      RIDER_LNG = position.coords.longitude;
+      if(btn) btn.textContent = '📍 Location shared — showing closest first';
+      loadAvailableDeliveries();
+    },
+    (error) => {
+      if(btn) btn.textContent = '📍 Use my location';
+      alert(error.code === error.PERMISSION_DENIED
+        ? 'Location permission denied — deliveries will show in the normal order instead.'
+        : 'Could not get your location right now.');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
 }
 
 async function claimDelivery(orderId){
@@ -291,7 +336,7 @@ async function loadDeliveries(){
       </div>
       ${!isDone ? `<div class="order-actions">
         ${o.status==='out_for_delivery' ? `<button class="primary" onclick="markPickedUp('${o.id}')">Picked up from store</button>` : ''}
-        ${o.status==='picked_up' ? `<button class="primary" onclick="markDelivered('${o.id}')">Mark delivered</button>` : ''}
+        ${o.status==='picked_up' ? `<button class="primary" onclick="markDelivered('${o.id}','${o.pickup_code}')">Mark delivered</button>` : ''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -313,7 +358,13 @@ async function notifyCustomer(orderId, status){
   } catch(e){ console.error('Customer notification failed', e); }
 }
 
-async function markDelivered(orderId){
+async function markDelivered(orderId, realCode){
+  const entered = prompt('Ask the customer for their order code to confirm handoff, then enter it here:');
+  if(entered === null) return; // rider cancelled
+  if(entered.trim().toUpperCase() !== (realCode || '').toUpperCase()){
+    alert('That code doesn\'t match this order — please double check with the customer before confirming delivery.');
+    return;
+  }
   await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
   notifyCustomer(orderId, 'delivered');
   await loadDeliveries();
