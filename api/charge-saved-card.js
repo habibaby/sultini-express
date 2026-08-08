@@ -204,6 +204,16 @@ export default async function handler(req, res) {
     }
 
     try {
+      await fetch(`https://www.sultini.com/api/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'customer', orderId: savedOrder.id, status: 'new' }),
+      });
+    } catch (custNotifyErr) {
+      console.error('Customer confirmation notification failed', custNotifyErr);
+    }
+
+    try {
       const vendorRes = await sb(`vendors?id=eq.${order.vendorId}&select=name`);
       const vendorRows = await vendorRes.json();
       if (vendorRows && vendorRows[0]) {
