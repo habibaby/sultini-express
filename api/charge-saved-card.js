@@ -185,14 +185,13 @@ export default async function handler(req, res) {
     });
 
     try {
-      await fetch('https://api.resend.com/emails', {
+      await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: 'Sultini Express <notifications@sultini.com>',
-          to: ['sultiniexpress@yahoo.com'],
-          subject: `Sultini Express: New order ${pickupCode}`,
-          text: `A new order (${pickupCode}) worth ₦${order.total} was just placed (paid with a saved card).`,
+          type: 'admin',
+          subject: `New order ${pickupCode}`,
+          message: `New order ${pickupCode} worth ₦${order.total} was just placed (paid with a saved card).`,
         }),
       });
     } catch (notifyErr) {
