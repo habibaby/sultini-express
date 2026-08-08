@@ -79,6 +79,44 @@ async function sendSMS(phone, message) {
   return data;
 }
 
+// ---- WhatsApp (Termii) — ready to switch on the moment WhatsApp is
+// approved for this Termii account. Same credentials as SMS, same
+// endpoint, just a different channel. Until then, this fails safely
+// and quietly, exactly like SMS does when the key isn't set.
+//
+// IMPORTANT: confirm the exact "channel" value with Termii once WhatsApp
+// is actually approved on the account — their docs show "whatsapp_otp"
+// for OTP-style sends and a separate template endpoint for messages with
+// media. This uses a plain conversational channel value, which should be
+// verified against the real approved setup before relying on it live.
+async function sendWhatsApp(phone, message) {
+  const apiKey = process.env.TERMII_API_KEY;
+  const senderId = process.env.TERMII_SENDER_ID || 'Sultini';
+  if (!apiKey) {
+    console.error('TERMII_API_KEY not set — WhatsApp message not sent to', phone);
+    return { skipped: true, reason: 'no_api_key' };
+  }
+  const digits = (phone || '').replace(/\D/g, '');
+  const intl = digits.startsWith('234') ? digits : '234' + digits.replace(/^0/, '');
+
+  try {
+    const res = await fetch('https://api.ng.termii.com/api/sms/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: intl, from: senderId, sms: message,
+        type: 'plain', channel: 'whatsapp', api_key: apiKey,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) console.error('Termii WhatsApp failed:', data);
+    return data;
+  } catch (e) {
+    console.error('Termii WhatsApp request failed:', e.message);
+    return { skipped: true, reason: 'request_failed' };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -119,13 +157,22 @@ export default async function handler(req, res) {
       const template = STATUS_MESSAGES[status];
       if (!template) return res.status(200).json({ skipped: true }); // not every status needs an email
 
-      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,customer_email,rejection_reason`, { headers: sbHeaders });
+      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,customer_email,guest_phone,rejection_reason`, { headers: sbHeaders });
       const orders = await orderRes.json();
       const order = orders && orders[0];
-      if (!order || !order.customer_email) return res.status(200).json({ skipped: true, reason: 'No customer email on file' });
+      if (!order) return res.status(200).json({ skipped: true, reason: 'Order not found' });
 
-      await sendEmail(order.customer_email, `Sultini Express: ${template.subject}`, template.text(order.pickup_code, order.rejection_reason));
-      return res.status(200).json({ success: true });
+      const messageText = template.text(order.pickup_code, order.rejection_reason);
+      if (order.customer_email) {
+        await sendEmail(order.customer_email, `Sultini Express: ${template.subject}`, messageText);
+      }
+      // WhatsApp only if a phone number is actually on file — email stays
+      // the guaranteed channel since every customer has one, phone doesn't.
+      let whatsappResult = null;
+      if (order.guest_phone) {
+        whatsappResult = await sendWhatsApp(order.guest_phone, messageText);
+      }
+      return res.status(200).json({ success: true, whatsappResult });
     }
 
     // ---- Vendor notification: new order came in — SMS, not email ----
@@ -143,14 +190,16 @@ export default async function handler(req, res) {
       // enough context to know which store it's actually for.
       if (vendor.managed_by_admin) {
         const adminMessage = `[${vendor.name}] ${message}`;
-        const smsResult = await sendSMS('2347033580395', adminMessage);
+        const smsResult = await sendSMS('2349113296387', adminMessage);
+        const whatsappResult = await sendWhatsApp('2349113296387', adminMessage);
         await sendEmail('sultiniexpress@yahoo.com', `Sultini: New order for ${vendor.name}`, adminMessage);
-        return res.status(200).json({ success: true, routedToAdmin: true, smsResult });
+        return res.status(200).json({ success: true, routedToAdmin: true, smsResult, whatsappResult });
       }
 
       if (!vendor.phone) return res.status(200).json({ skipped: true, reason: 'No phone number on file for this vendor' });
       const result = await sendSMS(vendor.phone, message);
-      return res.status(200).json({ success: true, result });
+      const whatsappResult = await sendWhatsApp(vendor.phone, message);
+      return res.status(200).json({ success: true, result, whatsappResult });
     }
 
     // ---- Rider notification: new delivery available for anyone to claim — SMS, not email ----
