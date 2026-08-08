@@ -236,7 +236,7 @@ async function loadAvailableDeliveries(){
   const dedicatedVendorIds = (dedicatedRows || []).map(r => r.dedicated_vendor_id);
 
   const { data: rawOrders } = await supabaseClient
-    .from('orders').select('*, vendors(name, address, lat, lng)')
+    .from('rider_visible_orders').select('*, vendors(name, address, lat, lng)')
     .eq('status', 'ready').eq('fulfilment', 'delivery').is('rider_id', null)
     .order('created_at', {ascending:true}).limit(40);
 
@@ -317,7 +317,7 @@ async function claimDelivery(orderId){
 
 async function loadDeliveries(){
   const { data: orders } = await supabaseClient
-    .from('orders').select('*, vendors(name, address)')
+    .from('rider_visible_orders').select('*, vendors(name, address)')
     .eq('rider_id', currentRider.id)
     .order('created_at', {ascending:false}).limit(30);
   const el = document.getElementById('deliveryList');
@@ -336,7 +336,7 @@ async function loadDeliveries(){
       </div>
       ${!isDone ? `<div class="order-actions">
         ${o.status==='out_for_delivery' ? `<button class="primary" onclick="markPickedUp('${o.id}')">Picked up from store</button>` : ''}
-        ${o.status==='picked_up' ? `<button class="primary" onclick="markDelivered('${o.id}','${o.pickup_code}')">Mark delivered</button>` : ''}
+        ${o.status==='picked_up' ? `<button class="primary" onclick="markDelivered('${o.id}')">Mark delivered</button>` : ''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -358,14 +358,20 @@ async function notifyCustomer(orderId, status){
   } catch(e){ console.error('Customer notification failed', e); }
 }
 
-async function markDelivered(orderId, realCode){
-  const entered = prompt('Ask the customer for their order code to confirm handoff, then enter it here:');
+async function markDelivered(orderId){
+  const entered = prompt('Ask the customer for their delivery code, then enter it here:');
   if(entered === null) return; // rider cancelled
-  if(entered.trim().toUpperCase() !== (realCode || '').toUpperCase()){
-    alert('That code doesn\'t match this order — please double check with the customer before confirming delivery.');
-    return;
-  }
-  await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+  if(!entered.trim()){ alert('Enter the code the customer gives you.'); return; }
+
+  // Verified server-side — the real code never reaches this page at all,
+  // so there's nothing here for a rider to inspect or guess from.
+  const resp = await fetch('/api/confirm-delivery', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ orderId, enteredCode: entered.trim() })
+  });
+  const result = await resp.json();
+  if(!resp.ok){ alert(result.error || 'Could not confirm delivery.'); return; }
+
   notifyCustomer(orderId, 'delivered');
   await loadDeliveries();
   await loadRiderEarnings();
