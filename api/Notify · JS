@@ -142,6 +142,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // ---- Direct email to a specific recipient (payout receipts, etc.) —
+    // distinct from 'admin', which always goes to Sultini's own inbox ----
+    if (type === 'direct_email') {
+      const { email, subject, message } = req.body;
+      if (!email || !subject || !message) return res.status(400).json({ error: 'Missing email, subject, or message' });
+      await sendEmail(email, subject, message);
+      return res.status(200).json({ success: true });
+    }
+
     if (type === 'admin') {
       const { subject, message } = req.body;
       if (!subject || !message) return res.status(400).json({ error: 'Missing subject or message' });
@@ -181,7 +190,7 @@ export default async function handler(req, res) {
       const { vendorId, message } = req.body;
       if (!vendorId || !message) return res.status(400).json({ error: 'Missing vendorId or message' });
 
-      const vendorRes = await fetch(`${SUPABASE_URL}/rest/v1/vendors?id=eq.${vendorId}&select=name,phone,managed_by_admin`, { headers: sbHeaders });
+      const vendorRes = await fetch(`${SUPABASE_URL}/rest/v1/vendors?id=eq.${vendorId}&select=name,email,phone,managed_by_admin`, { headers: sbHeaders });
       const vendors = await vendorRes.json();
       const vendor = vendors && vendors[0];
       if (!vendor) return res.status(200).json({ skipped: true, reason: 'Vendor not found' });
@@ -197,7 +206,13 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, routedToAdmin: true, smsResult, whatsappResult });
       }
 
-      if (!vendor.phone) return res.status(200).json({ skipped: true, reason: 'No phone number on file for this vendor' });
+      // SMS is attempted but won't actually deliver until Termii is
+      // approved — email is the one channel guaranteed to work right now,
+      // so it's sent regardless, not just as a fallback.
+      if (vendor.email) {
+        await sendEmail(vendor.email, `New order on Sultini Express`, message);
+      }
+      if (!vendor.phone) return res.status(200).json({ skipped: true, reason: 'No phone number on file for this vendor', emailSent: !!vendor.email });
       const result = await sendSMS(vendor.phone, message);
       const whatsappResult = await sendWhatsApp(vendor.phone, message);
       return res.status(200).json({ success: true, result, whatsappResult });
