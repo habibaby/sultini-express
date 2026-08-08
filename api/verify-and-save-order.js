@@ -233,16 +233,16 @@ export default async function handler(req, res) {
       }
     }
 
-    // Notify the admin by email — best-effort, doesn't block the order if it fails
+    // Notify the admin on every single order — email + WhatsApp, so this
+    // doesn't depend on checking the dashboard to know an order came in
     try {
-      await fetch('https://api.resend.com/emails', {
+      await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: 'Sultini Express <notifications@sultini.com>',
-          to: ['sultiniexpress@yahoo.com'],
-          subject: `Sultini Express: New order ${pickupCode}`,
-          text: `A new order (${pickupCode}) worth ₦${order.total} was just placed and paid for.`,
+          type: 'admin',
+          subject: `New order ${pickupCode}`,
+          message: `New order ${pickupCode} worth ₦${order.total} was just placed and paid for.`,
         }),
       });
     } catch (notifyErr) {
