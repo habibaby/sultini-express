@@ -671,11 +671,14 @@ async function loadOrderHistory(){
     } else if(canCancel){
       disputeSection = `<button onclick="cancelOrder('${o.id}')" style="background:none; border:none; color:var(--red, #B84C4C); font-size:11px; font-weight:700; text-decoration:underline; padding:0; margin-top:4px;">Cancel this order</button>`;
     }
+    const activeDeliveryCode = (o.fulfilment === 'delivery' && !['delivered','completed','cancelled','rejected'].includes(o.status) && o.delivery_confirmation_code)
+      ? `<div style="font-size:12px; color:var(--rose-deep); font-weight:700; margin-top:2px;">Give your rider this code: ${o.delivery_confirmation_code}</div>` : '';
     return `
     <div class="cart-item" style="align-items:flex-start; flex-direction:column; gap:6px;">
       <div class="cart-item-body">
         <h4 class="mono">${o.pickup_code}</h4>
         <div class="price">${o.vendors?.name || 'Store'} · ₦${Number(o.total).toLocaleString()}</div>
+        ${activeDeliveryCode}
       </div>
       <div id="historyTimeline-${o.id}" class="status-timeline" style="margin:8px 0 0; transform:scale(0.9); transform-origin:left;"></div>
       ${disputeSection}
@@ -1374,7 +1377,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
       });
       const result = await resp.json();
       if(!resp.ok) throw new Error(result.error || 'Could not charge saved card');
-      showConfirmation(result.pickupCode, result.orderId);
+      showConfirmation(result.pickupCode, result.orderId, result.deliveryConfirmationCode);
     } catch (err) {
       console.error(err);
       alert('Could not charge that card: ' + err.message);
@@ -1402,7 +1405,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
         });
         const result = await resp.json();
         if(!resp.ok) throw new Error(result.error || 'Could not save order');
-        showConfirmation(result.pickupCode, result.orderId);
+        showConfirmation(result.pickupCode, result.orderId, result.deliveryConfirmationCode);
       } catch (err) {
         console.error(err);
         alert('Payment succeeded but saving the order failed. Please contact support with reference: ' + transaction.reference);
@@ -1462,13 +1465,16 @@ function trackOrderLive(orderId, fulfilment){
     .subscribe();
 }
 
-function showConfirmation(pickupCode, orderId){
+function showConfirmation(pickupCode, orderId, deliveryConfirmationCode){
   trackFunnelEvent('order_completed', currentStore?.id);
   const storeNames = [...new Set(Object.values(cart).map(c=>c.store.name))].join(', ');
-  document.getElementById('confirmCode').textContent = pickupCode;
+  // Delivery orders show the separate, rider-never-sees-it code — the
+  // real proof of delivery. Pickup orders keep showing pickup_code, since
+  // that flow (customer shows vendor in person) was never the leak.
+  document.getElementById('confirmCode').textContent = fulfilment==='delivery' ? (deliveryConfirmationCode || pickupCode) : pickupCode;
   const timeLabel = fulfilment==='delivery' ? 'On the way once ready' : (pickupTime==='now'?'Ready shortly':(pickupTime==='1hr'?'Ready in about 1 hour':'Ready at your set time'));
   document.getElementById('confirmDetail').textContent = `${timeLabel} · ${storeNames}`;
-  document.getElementById('confirmSub').textContent = fulfilment==='delivery' ? "A rider will be assigned once your order is ready. Share this code with them when they arrive, to confirm it's really you." : "Show this code at pickup — it's yours alone.";
+  document.getElementById('confirmSub').textContent = fulfilment==='delivery' ? "A rider will be assigned once your order is ready. This code is only for you — only share it with your rider once they've actually handed you your order." : "Show this code at pickup — it's yours alone.";
   renderStatusTimeline(document.getElementById('liveStatusTimeline'), 'new', fulfilment);
   if(orderId) trackOrderLive(orderId, fulfilment);
   cart = {}; fulfilment = null; pickupTime = null;
