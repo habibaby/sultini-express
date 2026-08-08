@@ -236,7 +236,7 @@ export default async function handler(req, res) {
     // Notify the admin on every single order — email + WhatsApp, so this
     // doesn't depend on checking the dashboard to know an order came in
     try {
-      await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
+      await fetch(`https://www.sultini.com/api/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -255,7 +255,7 @@ export default async function handler(req, res) {
       const vendorRes = await sb(`vendors?id=eq.${order.vendorId}&select=name`);
       const vendorRows = await vendorRes.json();
       if (vendorRows && vendorRows[0]) {
-        await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
+        await fetch(`https://www.sultini.com/api/notify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
