@@ -207,9 +207,14 @@
 
 <!-- PAYOUTS -->
 <section class="page" id="page-payouts">
-  <div class="page-title">Cash-outs</div>
-  <div class="page-sub">Approve after the 1-day dispute window has passed</div>
+  <div class="page-title">Payouts</div>
+  <div class="page-sub">Pay vendors and riders directly, then keep track of what's been sent</div>
+  <div style="display:flex; gap:8px; margin-bottom:14px;">
+    <button id="payoutsTabPending" class="btn" onclick="showPayoutsTab('pending')" style="flex:1; background:var(--plum); color:#fff;">To pay</button>
+    <button id="payoutsTabHistory" class="btn" onclick="showPayoutsTab('history')" style="flex:1;">History</button>
+  </div>
   <div id="payoutsContainer">Loading…</div>
+  <div id="payoutsHistoryContainer" style="display:none;">Loading…</div>
 </section>
 
 <!-- RIDERS -->
@@ -1315,67 +1320,92 @@ async function markDelivered(orderId, vendorId, deliveryFee){
 }
 
 // ---- Payouts ----
+function showPayoutsTab(tab){
+  document.getElementById('payoutsContainer').style.display = tab==='pending' ? 'block' : 'none';
+  document.getElementById('payoutsHistoryContainer').style.display = tab==='history' ? 'block' : 'none';
+  document.getElementById('payoutsTabPending').style.background = tab==='pending' ? 'var(--plum)' : '';
+  document.getElementById('payoutsTabPending').style.color = tab==='pending' ? '#fff' : '';
+  document.getElementById('payoutsTabHistory').style.background = tab==='history' ? 'var(--plum)' : '';
+  document.getElementById('payoutsTabHistory').style.color = tab==='history' ? '#fff' : '';
+  if(tab==='history') loadPayoutHistory();
+}
+
+async function loadPayoutHistory(){
+  const { data: entries } = await supabaseClient
+    .from('ledger_entries').select('*, vendors(name), riders(full_name)')
+    .eq('status', 'paid')
+    .order('paid_at', {ascending:false}).limit(100);
+
+  const el = document.getElementById('payoutsHistoryContainer');
+  if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No payments recorded yet.</div>'; return; }
+
+  const total = entries.reduce((sum, e) => sum + Number(e.amount), 0);
+  el.innerHTML = `
+    <div class="meta" style="background:var(--stone); border-radius:8px; padding:10px; margin-bottom:10px; font-weight:700;">
+      Total paid out: ₦${total.toLocaleString()} across ${entries.length} payment${entries.length===1?'':'s'}
+    </div>
+  ` + entries.map(e => {
+    const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
+    const paidDate = e.paid_at ? new Date(e.paid_at).toLocaleDateString('en-NG', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+    return `<div class="card">
+      <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Paid ${paidDate}</div></div><span class="pill approved">₦${Number(e.amount).toLocaleString()}</span></div>
+    </div>`;
+  }).join('');
+}
+
 async function loadPayouts(){
   const { data: entries } = await supabaseClient
-    .from('ledger_entries_effective').select('*, vendors(name, account_verified), riders(full_name, account_verified), orders(status, fulfilment, pickup_code)')
-    .in('effective_status', ['available','cashout_requested','in_dispute_window','held','processing','transfer_failed','awaiting_fulfillment_confirmation'])
+    .from('ledger_entries_effective').select('*, vendors(name, account_verified, account_name, bank_name, account_number), riders(full_name, account_verified, account_name, bank_name, account_number), orders(status, fulfilment, pickup_code)')
+    .in('effective_status', ['available','held','awaiting_fulfillment_confirmation'])
     .order('created_at', {ascending:false}).limit(30);
 
-  const actionable = (entries||[]).filter(e => e.effective_status==='available' || e.effective_status==='cashout_requested' || e.effective_status==='transfer_failed').length;
+  const actionable = (entries||[]).filter(e => e.effective_status==='available').length;
   const payoutsBadge = document.getElementById('payoutsNavBadge');
   if(actionable > 0){ payoutsBadge.dataset.n = actionable; payoutsBadge.classList.add('badge-dot'); }
   else { payoutsBadge.classList.remove('badge-dot'); }
 
   const el = document.getElementById('payoutsContainer');
-  if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No pending cash-outs.</div>'; return; }
+  if(!entries || entries.length===0){ el.innerHTML = '<div class="empty">No pending payouts.</div>'; return; }
   el.innerHTML = entries.map(e => {
+    const recipient = e.recipient_type==='vendor' ? e.vendors : e.riders;
     const who = e.recipient_type==='vendor' ? (e.vendors?.name||'Vendor') : (e.riders?.full_name||'Rider');
-    const verified = e.recipient_type==='vendor' ? e.vendors?.account_verified : e.riders?.account_verified;
+    const verified = recipient?.account_verified;
 
     if(e.effective_status==='held'){
       return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ Held — customer dispute open</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
       <div class="row-actions"><button onclick="go('disputes')">Review dispute</button><button class="primary" onclick="setLedgerStatus('${e.id}','available')">Release hold</button></div></div>`;
     }
-    if(e.effective_status==='in_dispute_window'){
-      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Still in dispute window</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
-    }
     if(e.effective_status==='awaiting_fulfillment_confirmation'){
       const orderInfo = e.orders?.fulfilment==='pickup'
         ? `waiting for the vendor to confirm the customer's pickup code (order ${e.orders?.pickup_code||''})`
         : `waiting for the order to be confirmed delivered`;
-      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⏸ Dispute window passed, but still ${orderInfo}</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
-      <div class="meta" style="margin-top:4px;">Money is intentionally held — this is not a bug. It'll become payable automatically once fulfillment is confirmed.</div></div>`;
-    }
-    if(e.effective_status==='processing'){
-      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⏳ Sent to Paystack, awaiting confirmation</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
-    }
-    if(e.effective_status==='transfer_failed'){
-      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ❌ Transfer failed: ${e.failure_reason||'unknown reason'}</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
-      <div class="row-actions"><button class="primary" onclick="payOut('${e.id}')">Retry payout</button></div></div>`;
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⏸ ${orderInfo}</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="meta" style="margin-top:4px;">This isn't payable yet — the order itself hasn't been confirmed complete.</div></div>`;
     }
     if(!verified){
-      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ No verified payout account — cannot pay out yet</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
+      return `<div class="card"><div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · ⚠️ No verified bank account on file — cannot confirm where to send this yet</div></div><span class="pill flag">₦${Number(e.amount).toLocaleString()}</span></div></div>`;
     }
     return `<div class="card">
       <div class="top"><div><h4>${who}</h4><div class="meta">${e.recipient_type} · Ready to pay</div></div><span class="pill pending">₦${Number(e.amount).toLocaleString()}</span></div>
+      <div class="meta" style="background:var(--stone); border-radius:8px; padding:8px 10px; margin-top:6px; font-weight:600;">
+        ${recipient.account_name}<br>${recipient.bank_name} · ${recipient.account_number}
+      </div>
       <div class="row-actions">
         <button class="danger" onclick="setLedgerStatus('${e.id}','held')">Hold</button>
-        <button class="primary" onclick="payOut('${e.id}')">Pay out via Paystack</button>
+        <button class="primary" onclick="markPaidManually('${e.id}', '${(recipient.account_name||'').replace(/'/g,"\\'")}', ${Number(e.amount)})">Mark as paid</button>
       </div>
     </div>`;
   }).join('');
 }
 
-async function payOut(ledgerEntryId){
-  if(!confirm('Send this payout via Paystack now? This moves real money.')) return;
-  const resp = await fetch('/api/pay-out', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ ledgerEntryId })
-  });
-  const result = await resp.json();
-  if(!resp.ok){ alert('Payout failed: ' + result.error); await loadPayouts(); return; }
-  alert('Transfer sent — status will update to "paid" once Paystack confirms it.');
+async function markPaidManually(ledgerEntryId, accountName, amount){
+  const confirmed = confirm(`Confirm you have personally sent ₦${amount.toLocaleString()} to ${accountName}'s bank account.\n\nThis marks the payout as complete and cannot be undone. Only tap OK after the transfer has actually gone through.`);
+  if(!confirmed) return;
+  const { error } = await supabaseClient
+    .from('ledger_entries')
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('id', ledgerEntryId);
+  if(error){ alert('Could not update: ' + error.message); return; }
   await loadPayouts();
 }
 
