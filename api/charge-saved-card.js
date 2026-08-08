@@ -106,6 +106,10 @@ export default async function handler(req, res) {
 
     // ---- Step 2: write the order to Supabase, same as a normal payment ----
     const pickupCode = 'SK-' + Math.floor(1000 + Math.random() * 9000);
+    // Genuinely separate from pickup_code — this is the actual
+    // proof-of-delivery secret. It only ever reaches the customer and
+    // admin, never a rider, so a rider can't know it in advance.
+    const deliveryConfirmationCode = String(Math.floor(1000 + Math.random() * 9000));
 
     const sb = (path, opts = {}) =>
       fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -123,6 +127,7 @@ export default async function handler(req, res) {
       method: 'POST',
       body: JSON.stringify([{
         pickup_code: pickupCode,
+        delivery_confirmation_code: deliveryConfirmationCode,
         vendor_id: order.vendorId,
         customer_id: order.customerId || null,
         fulfilment: order.fulfilment,
@@ -216,7 +221,7 @@ export default async function handler(req, res) {
       console.error('Vendor notification failed', vendorNotifyErr);
     }
 
-    return res.status(200).json({ success: true, pickupCode, orderId: savedOrder.id });
+    return res.status(200).json({ success: true, pickupCode, deliveryConfirmationCode, orderId: savedOrder.id });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong charging the card or saving the order' });
