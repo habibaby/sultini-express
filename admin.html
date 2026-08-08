@@ -1178,7 +1178,7 @@ function filterAndRenderOrders(){
       } else if(o.status === 'picked_up'){
         externalRiderActions = `<div class="row-actions" style="margin-top:6px;">
           <input type="text" id="adminDeliveryCode-${o.id}" placeholder="Enter customer's code" style="flex:1; padding:10px; border-radius:10px; border:1.5px solid var(--line);">
-          <button class="primary" onclick="adminMarkDelivered('${o.id}','${o.pickup_code}')">Confirm delivered</button>
+          <button class="primary" onclick="adminMarkDelivered('${o.id}')">Confirm delivered</button>
         </div>`;
       }
     }
@@ -1258,12 +1258,18 @@ async function adminMarkPickedUp(orderId){
   await loadOrders();
 }
 
-async function adminMarkDelivered(orderId, realCode){
+async function adminMarkDelivered(orderId){
   const input = document.getElementById('adminDeliveryCode-'+orderId);
-  const entered = (input.value || '').trim().toUpperCase();
+  const entered = (input.value || '').trim();
   if(!entered){ alert('Enter the code the customer gives the rider.'); return; }
-  if(entered !== String(realCode).toUpperCase()){ alert('That code doesn\'t match this order — double-check with the customer before confirming.'); return; }
-  await supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+
+  const resp = await fetch('/api/confirm-delivery', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ orderId, enteredCode: entered })
+  });
+  const result = await resp.json();
+  if(!resp.ok){ alert(result.error || 'Could not confirm delivery.'); return; }
+
   notifyCustomer(orderId, 'delivered');
   await loadOrders();
 }
@@ -1355,7 +1361,7 @@ async function loadPayoutHistory(){
 
 async function loadPayouts(){
   const { data: entries } = await supabaseClient
-    .from('ledger_entries_effective').select('*, vendors(name, account_verified, account_name, bank_name, account_number), riders(full_name, account_verified, account_name, bank_name, account_number), orders(status, fulfilment, pickup_code)')
+    .from('ledger_entries_effective').select('*, vendors(name, email, account_verified, account_name, bank_name, account_number), riders(full_name, account_verified, account_name, bank_name, account_number), orders(status, fulfilment, pickup_code)')
     .in('effective_status', ['available','held','awaiting_fulfillment_confirmation'])
     .order('created_at', {ascending:false}).limit(30);
 
@@ -1392,13 +1398,13 @@ async function loadPayouts(){
       </div>
       <div class="row-actions">
         <button class="danger" onclick="setLedgerStatus('${e.id}','held')">Hold</button>
-        <button class="primary" onclick="markPaidManually('${e.id}', '${(recipient.account_name||'').replace(/'/g,"\\'")}', ${Number(e.amount)})">Mark as paid</button>
+        <button class="primary" onclick="markPaidManually('${e.id}', '${(recipient.account_name||'').replace(/'/g,"\\'")}', ${Number(e.amount)}, '${e.recipient_type}', '${(e.recipient_type==='vendor' ? (recipient.email||'') : '').replace(/'/g,"\\'")}')">Mark as paid</button>
       </div>
     </div>`;
   }).join('');
 }
 
-async function markPaidManually(ledgerEntryId, accountName, amount){
+async function markPaidManually(ledgerEntryId, accountName, amount, recipientType, email){
   const confirmed = confirm(`Confirm you have personally sent ₦${amount.toLocaleString()} to ${accountName}'s bank account.\n\nThis marks the payout as complete and cannot be undone. Only tap OK after the transfer has actually gone through.`);
   if(!confirmed) return;
   const { error } = await supabaseClient
@@ -1406,6 +1412,24 @@ async function markPaidManually(ledgerEntryId, accountName, amount){
     .update({ status: 'paid', paid_at: new Date().toISOString() })
     .eq('id', ledgerEntryId);
   if(error){ alert('Could not update: ' + error.message); return; }
+
+  // A real, independent, timestamped receipt — not just something that
+  // shows up in the app if they happen to check. Riders don't have email
+  // on file yet, so this only reaches vendors for now.
+  if(recipientType === 'vendor' && email){
+    try {
+      await fetch('https://www.sultini.com/api/notify', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          type: 'direct_email',
+          email: email,
+          subject: `Payment sent — ₦${amount.toLocaleString()}`,
+          message: `Hi ${accountName},\n\n₦${amount.toLocaleString()} has been sent to your bank account for your Sultini Express earnings, on ${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})}.\n\nYou can also see this reflected in your Earnings tab on your Sultini vendor dashboard.\n\nThank you for being part of Sultini Express.`,
+        })
+      });
+    } catch(e){ console.error('Payout receipt email failed', e); }
+  }
+
   await loadPayouts();
 }
 
