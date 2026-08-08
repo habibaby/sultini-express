@@ -254,6 +254,20 @@ export default async function handler(req, res) {
       console.error('Notification failed', notifyErr);
     }
 
+    // Confirm the order to the customer too, with their real codes — this
+    // is their one permanent record if they close the app right after
+    // ordering, especially important for guests with no account to fall
+    // back on for order history
+    try {
+      await fetch(`https://www.sultini.com/api/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'customer', orderId: savedOrder.id, status: 'new' }),
+      });
+    } catch (custNotifyErr) {
+      console.error('Customer confirmation notification failed', custNotifyErr);
+    }
+
     // Notify the vendor too — SMS now, not email, since vendors are on
     // the move and often don't check email promptly
     try {
