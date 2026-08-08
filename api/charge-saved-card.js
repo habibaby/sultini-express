@@ -185,7 +185,7 @@ export default async function handler(req, res) {
     });
 
     try {
-      await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
+      await fetch(`https://www.sultini.com/api/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,7 +202,7 @@ export default async function handler(req, res) {
       const vendorRes = await sb(`vendors?id=eq.${order.vendorId}&select=name`);
       const vendorRows = await vendorRes.json();
       if (vendorRows && vendorRows[0]) {
-        await fetch(`${req.headers.origin || 'https://sultini.com'}/api/notify`, {
+        await fetch(`https://www.sultini.com/api/notify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
