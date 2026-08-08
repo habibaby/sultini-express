@@ -146,7 +146,8 @@ export default async function handler(req, res) {
       const { subject, message } = req.body;
       if (!subject || !message) return res.status(400).json({ error: 'Missing subject or message' });
       await sendEmail('sultiniexpress@yahoo.com', `Sultini Express: ${subject}`, message);
-      return res.status(200).json({ success: true });
+      const whatsappResult = await sendWhatsApp('2349113296387', `${subject}\n\n${message}`);
+      return res.status(200).json({ success: true, whatsappResult });
     }
 
     // ---- Customer notification: order status changed ----
