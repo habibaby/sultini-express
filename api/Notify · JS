@@ -13,6 +13,15 @@
 // failed until now. Fixed here as part of the merge.
 
 const STATUS_MESSAGES = {
+  new: {
+    subject: 'Order confirmed',
+    text: (code, reason, deliveryCode, fulfilment) => {
+      if (fulfilment === 'delivery') {
+        return `Your order ${code} is confirmed!\n\nKeep this email — it's your record even if you close the app.\n\nWhen your rider arrives, give them this delivery code to confirm it's really you: ${deliveryCode}\n\nDon't share this code with anyone before your order actually arrives.`;
+      }
+      return `Your order ${code} is confirmed!\n\nKeep this email — it's your record even if you close the app.\n\nShow this code at the store to collect your order: ${code}`;
+    },
+  },
   rejected: {
     subject: "Your order couldn't be accepted",
     text: (code, reason) => `Unfortunately the store wasn't able to accept your order ${code}.${reason ? ` Reason given: ${reason}.` : ''} If you paid online, this has been refunded automatically.`,
@@ -167,12 +176,12 @@ export default async function handler(req, res) {
       const template = STATUS_MESSAGES[status];
       if (!template) return res.status(200).json({ skipped: true }); // not every status needs an email
 
-      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,customer_email,guest_phone,rejection_reason`, { headers: sbHeaders });
+      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pickup_code,delivery_confirmation_code,fulfilment,customer_email,guest_phone,rejection_reason`, { headers: sbHeaders });
       const orders = await orderRes.json();
       const order = orders && orders[0];
       if (!order) return res.status(200).json({ skipped: true, reason: 'Order not found' });
 
-      const messageText = template.text(order.pickup_code, order.rejection_reason);
+      const messageText = template.text(order.pickup_code, order.rejection_reason, order.delivery_confirmation_code, order.fulfilment);
       if (order.customer_email) {
         await sendEmail(order.customer_email, `Sultini Express: ${template.subject}`, messageText);
       }
