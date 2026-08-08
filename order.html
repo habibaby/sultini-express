@@ -220,6 +220,7 @@
     </div>
   </div>
   <div id="storeAvailabilityBanner" style="display:none; margin:12px 16px; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:600;"></div>
+  <div id="storePreorderBanner" style="display:none; margin:12px 16px; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:600; background:#FFF6E5; border:1px solid #F0D9A0;"></div>
   <div id="menuContainer"></div>
 </section>
 
@@ -907,6 +908,12 @@ async function loadStores(){
       rating: v.rating || 0,
       time: (v.avg_delivery_minutes || 25) + ' min',
       opening_time: v.opening_time || null,
+      requires_preorder: v.requires_preorder || false,
+      preorder_cutoff_time: v.preorder_cutoff_time || '21:00',
+      min_order_quantity: v.min_order_quantity || null,
+      pickup_slot_times: v.pickup_slot_times || null,
+      delivery_window_start: v.delivery_window_start || null,
+      delivery_window_end: v.delivery_window_end || null,
       closing_time: v.closing_time || null,
       is_open: v.is_open,
       address: v.address || null,
@@ -986,6 +993,20 @@ function trackFunnelEvent(eventType, vendorId){
     .then(() => {}).catch(() => {});
 }
 
+function getPreorderFulfillmentDate(vendor){
+  const now = new Date();
+  const [cutH, cutM] = (vendor.preorder_cutoff_time || '21:00').split(':').map(Number);
+  const cutoffToday = new Date(now);
+  cutoffToday.setHours(cutH, cutM, 0, 0);
+
+  // Before cutoff -> ready tomorrow. After cutoff -> ready the day after,
+  // since tonight's window for "tomorrow" has already closed.
+  const daysAhead = now < cutoffToday ? 1 : 2;
+  const fulfillDate = new Date(now);
+  fulfillDate.setDate(fulfillDate.getDate() + daysAhead);
+  return fulfillDate;
+}
+
 function openStore(id){
   currentStore = STORES.find(s=>s.id===id);
   trackFunnelEvent('store_viewed', id);
@@ -1002,6 +1023,19 @@ function openStore(id){
     addressEl.style.display = 'block';
   } else {
     addressEl.style.display = 'none';
+  }
+
+  const preorderBanner = document.getElementById('storePreorderBanner');
+  if(currentStore.requires_preorder){
+    const fulfillDate = getPreorderFulfillmentDate(currentStore);
+    const dateLabel = fulfillDate.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'});
+    const cutoffLabel = formatTime(currentStore.preorder_cutoff_time);
+    let msg = `📦 Pre-order only — order today, ready ${dateLabel}. Orders after ${cutoffLabel} move to the next available day.`;
+    if(currentStore.min_order_quantity) msg += ` Minimum ${currentStore.min_order_quantity} pieces per order.`;
+    preorderBanner.textContent = msg;
+    preorderBanner.style.display = 'block';
+  } else {
+    preorderBanner.style.display = 'none';
   }
 
   const avail = getStoreAvailability(currentStore);
@@ -1192,16 +1226,23 @@ function updatePayOptions(){
   else { codEl.classList.add('locked'); sub.textContent = `Unlocks after your 5th order — you're at ${CUSTOMER.completedOrders}/5`; }
 }
 function renderSummary(){
-  const {subtotal} = cartTotals();
+  const {subtotal, count} = cartTotals();
   const deliveryFee = fulfilment==='delivery' ? (REAL_DELIVERY_FEE ?? DELIVERY_FEE) : 0;
   const total = subtotal + deliveryFee;
   const distanceNote = (fulfilment==='delivery' && REAL_DELIVERY_DISTANCE_KM != null)
     ? ` <span style="color:var(--ink-soft); font-weight:400;">(${REAL_DELIVERY_DISTANCE_KM}km)</span>` : '';
+
+  const minQty = currentStore?.min_order_quantity;
+  const shortBy = minQty ? Math.max(0, minQty - count) : 0;
+  const minQtyNote = shortBy > 0
+    ? `<div class="summary-row" style="color:var(--rose-deep); font-weight:700;"><span>⚠️ Add ${shortBy} more — ${minQty} minimum for this store</span></div>` : '';
+
   document.getElementById('summaryContainer').innerHTML = `
     <div class="summary-row"><span>Subtotal</span><span>₦${subtotal.toLocaleString()}</span></div>
     <div class="summary-row"><span>Delivery fee${distanceNote}</span><span>${fulfilment==='delivery' ? '₦'+deliveryFee.toLocaleString() : (fulfilment==='pickup' ? 'Free (pickup)' : '—')}</span></div>
+    ${minQtyNote}
     <div class="summary-row total"><span>Total</span><span>₦${total.toLocaleString()}</span></div>`;
-  const ready = fulfilment && (fulfilment==='delivery' || (fulfilment==='pickup' && pickupTime));
+  const ready = fulfilment && (fulfilment==='delivery' || (fulfilment==='pickup' && pickupTime)) && shortBy === 0;
   document.getElementById('placeOrderBtn').classList.toggle('disabled', !ready);
 }
 
@@ -1289,16 +1330,32 @@ document.getElementById('optPickup').addEventListener('click', ()=>{
   document.getElementById('optDelivery').classList.remove('selected');
   document.getElementById('pickupTimeGroup').style.display='block';
   document.getElementById('deliveryAddressGroup').style.display='none';
+  renderPickupTimeOptions();
   renderSummary();
 });
-document.querySelectorAll('.time-chip').forEach(chip=>{
-  chip.addEventListener('click', ()=>{
-    document.querySelectorAll('.time-chip').forEach(c=>c.classList.remove('selected'));
-    chip.classList.add('selected');
-    pickupTime = chip.dataset.time;
-    renderSummary();
+function renderPickupTimeOptions(){
+  const row = document.querySelector('.pickup-time-row');
+  pickupTime = null;
+  if(currentStore?.requires_preorder && currentStore.pickup_slot_times?.length){
+    const fulfillDate = getPreorderFulfillmentDate(currentStore);
+    const dateLabel = fulfillDate.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+    row.innerHTML = `<div style="width:100%; font-size:12px; color:var(--ink-soft); margin-bottom:6px;">Pickup slots for ${dateLabel}:</div>` +
+      currentStore.pickup_slot_times.map(slot => `<button class="time-chip" data-time="${slot}">${slot}</button>`).join('');
+  } else {
+    row.innerHTML = `
+      <button class="time-chip" data-time="now">Now</button>
+      <button class="time-chip" data-time="1hr">In 1 hour</button>
+      <button class="time-chip" data-time="custom">Set a time…</button>`;
+  }
+  row.querySelectorAll('.time-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      row.querySelectorAll('.time-chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+      pickupTime = chip.dataset.time;
+      renderSummary();
+    });
   });
-});
+}
 document.getElementById('payOnline').addEventListener('click', ()=>{
   selectedSavedCardId = null;
   document.querySelectorAll('#savedCardPayOptions .pay-option').forEach(el => el.classList.remove('selected'));
